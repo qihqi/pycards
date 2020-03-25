@@ -35,8 +35,11 @@ async def index(request):
                     g.new_player(arg)
                     name = arg
                     broadcast_result['players'] = g.players()
+                    cur_result['table'] = g.table()
+                    cur_result['hand'] = g.get_hand(name)
                 elif action == 'START':
                     g.start(arg)
+                    g.clean_table()
                 elif action == 'DRAW':
                     g.draw(name, arg)
                     cur_result['hand'] = g.get_hand(name)

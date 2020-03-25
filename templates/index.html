@@ -33,15 +33,25 @@
 				<h3>桌面:</h3>
 				<button id="takeback">拿回来</button>
 			</div>
-			<div class="row">
-				<div class="mygrid" id="table"></div>
+			<div class="row" id="table">
 			</div>
 
 			<hr />
 
-			<div class="row">
+			<div class="row" style="vertical-align:text-top">
 				<h3>手牌:  </h3>
 				<button id="send">出牌</button>
+				<form id="sort_form"> 
+					<span>主花色</span>
+					<input type="radio" class="suite_radio" name="suite" value="S"><span style="font-size:30px">&#9824</span></input>
+					<input type="radio"  class="suite_radio" name="suite" value="H"><span style="font-size:30px">&#9829</span></input>
+					<input type="radio" class="suite_radio"  name="suite" value="C"><span style="font-size:30px">&#9827</span></input>
+					<input type="radio" class="suite_radio"  name="suite" value="D"><span style="font-size:30px">&#9830</span></input>
+					<input type="radio" class="suite_radio"  name="suite" value="NT"><span>NT</span></input>
+					<span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
+					<input type="text" id="number_input" name="number" size=5></input>
+					<input type="submit" id="sort_hand" value="排序"></input>
+				</form>
 			</div>
 			<div class="row">
 				<div class="mygrid" id="hand"></div>
@@ -53,7 +63,6 @@
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 		<script language="javascript" type="text/javascript">
 			var card_img_urls = [
-"https://deckofcardsapi.com/static/img/AC.png",
 "https://deckofcardsapi.com/static/img/2C.png",
 "https://deckofcardsapi.com/static/img/3C.png",
 "https://deckofcardsapi.com/static/img/4C.png",
@@ -66,7 +75,7 @@
 "https://deckofcardsapi.com/static/img/JC.png",
 "https://deckofcardsapi.com/static/img/QC.png",
 "https://deckofcardsapi.com/static/img/KC.png",
-"https://deckofcardsapi.com/static/img/AD.png",
+"https://deckofcardsapi.com/static/img/AC.png",
 "https://deckofcardsapi.com/static/img/2D.png",
 "https://deckofcardsapi.com/static/img/3D.png",
 "https://deckofcardsapi.com/static/img/4D.png",
@@ -79,7 +88,7 @@
 "https://deckofcardsapi.com/static/img/JD.png",
 "https://deckofcardsapi.com/static/img/QD.png",
 "https://deckofcardsapi.com/static/img/KD.png",
-"https://deckofcardsapi.com/static/img/AH.png",
+"https://deckofcardsapi.com/static/img/AD.png",
 "https://deckofcardsapi.com/static/img/2H.png",
 "https://deckofcardsapi.com/static/img/3H.png",
 "https://deckofcardsapi.com/static/img/4H.png",
@@ -92,7 +101,7 @@
 "https://deckofcardsapi.com/static/img/JH.png",
 "https://deckofcardsapi.com/static/img/QH.png",
 "https://deckofcardsapi.com/static/img/KH.png",
-"https://deckofcardsapi.com/static/img/AS.png",
+"https://deckofcardsapi.com/static/img/AH.png",
 "https://deckofcardsapi.com/static/img/2S.png",
 "https://deckofcardsapi.com/static/img/3S.png",
 "https://deckofcardsapi.com/static/img/4S.png",
@@ -105,6 +114,7 @@
 "https://deckofcardsapi.com/static/img/JS.png",
 "https://deckofcardsapi.com/static/img/QS.png",
 "https://deckofcardsapi.com/static/img/KS.png",
+"https://deckofcardsapi.com/static/img/AS.png",
 				"/static/joker.jpg",
 "https://deckofcardsapi.com/static/img/XX.png",
 				];
@@ -131,6 +141,57 @@
 				hand: [],
 				selected: {},
 			};  // game has player, table, and hand as property
+				
+			var sort_function = null;
+
+				function normalize_card_val(current_suite, current_val, tsuite, tval) {
+					if (current_suite == 'JOKER') {
+						current_suite = 'Z';  
+						current_val = 15 + current_val;
+					}
+					if (current_val == tval) {
+						var bonus = current_suite == tsuite ? 2 : 1;
+						current_suite = 'Z';
+						current_val = 13 + bonus;
+					}
+					if (tsuite != 'NT' && current_suite == tsuite) {
+						current_suite = 'Z';
+					}
+					return [current_suite, current_val];
+				}
+
+				function update_ui() {
+					$('#players').empty();
+					for (var i in game.players) {
+						var c = $('<div class="col-sm">') ;
+						c.text(game.players[i]);
+						$('#players').append(c);
+					}
+					$('#table').empty();
+					for (var i in game.table) {
+						var player_name = game.table[i][0];
+						var cards = game.table[i][1];
+						var col = $('<div class="col-sm">');
+						var slot = $('<div class="mygrid">');
+						for (var j in cards) {
+							var c = make_card(cards[j]);
+							slot.append(c);
+						}
+						col.append($('<p>' + player_name + '</p>'));
+						col.append(slot);
+						$('#table').append(col);
+					}
+					$('#hand').empty();
+					if (sort_function != null) {
+						game.hand.sort(sort_function);
+					}
+					for (var i in game.hand) {
+						var c = make_card(game.hand[i]);
+						$('#hand').append(c);
+					}
+				}
+
+                       
 
 			$(function() {
 				var conn = null;
@@ -184,31 +245,6 @@
 						conn = null;
 						name = 'UNKNOWN';
 						update_ui();
-					}
-				}
-				function update_ui() {
-					if (conn == null) {
-						$('#status').text('disconnected');
-						$('#connect').html('Connect');
-					} else {
-						$('#status').text('connected (' + conn.protocol + ')');
-						$('#connect').html('Disconnect');
-					}
-					$('#players').empty();
-					for (var i in game.players) {
-						var c = $('<div class="col-sm">') ;
-						c.text(game.players[i]);
-						$('#players').append(c);
-					}
-					$('#table').empty();
-					for (var i in game.table) {
-						var c = make_card(game.table[i]);
-						$('#table').append(c);
-					}
-					$('#hand').empty();
-					for (var i in game.hand) {
-						var c = make_card(game.hand[i]);
-						$('#hand').append(c);
 					}
 				}
 				$('#connect').on('click', function() {
@@ -270,6 +306,29 @@
 					return false;
 				});
 
+				$('#sort_form').on('submit', function(event) {
+					var data = new FormData(this); 
+					console.log(data);
+					var suite = $('.suite_radio:checked').val();
+					var val =  $('#number_input').val();
+					console.log(suite, val);
+					sort_function = function(suite, val, l, r) {
+						l = normalize_card_val(l.value[0], l.value[1], suite, val);
+						r = normalize_card_val(r.value[0], r.value[1], suite, val);
+						var result;
+						result = l[1] - r[1];
+						console.log('here1', result);
+						if (l[0] != r[0]) {
+							result = l[0].charCodeAt(0) - r[0].charCodeAt(0);
+							console.log('here2', result);
+						}
+						console.log(l, r, result);
+						return result;
+					}.bind(null, suite, val);
+
+					update_ui();
+					event.preventDefault();
+				});
 			});
 		</script>
 	</body>
