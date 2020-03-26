@@ -69,6 +69,11 @@ async def index(request):
                 elif action == 'END_TURN':
                     g.incr_turn_number()
                     broadcast_result['turn_number'] = g.turn_number()
+                elif action == 'RETURN_TO_DECK':
+                    arg = list(map(int, arg))
+                    g.return_to_deck(name, arg)
+                    broadcast_result['deck_cards'] = len(g.deck)
+                    cur_result['hand'] = g.get_hand(name)
                 else:
                     raise ValueError('{} is not valid action'.format(action))
             except ValueError as e:

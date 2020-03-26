@@ -78,6 +78,10 @@ function make_card(card, is_hand) {
     input.attr('card_id', card.id);
     var card_img = $('<img height="120" >');
     card_img.attr('src', card_img_urls[card.id % 54]);
+    card_img.click(function(input) { 
+        input.prop('checked', !input.is(':checked'));
+        input.trigger('change');
+    }.bind(null, input));
     x.append(input);
     x.append(card_img);
     return x;
@@ -99,6 +103,10 @@ game.is_my_turn = function() {
     return this.turn_number % this.players.length == this.player_id;
 }
 
+game.player = function() {
+    return this.players[this.turn_number % this.players.length];
+}
+
 var sort_function =  function(suite, val, l, r) {
     l = normalize_card_val(l.value[0], l.value[1], suite, val);
     r = normalize_card_val(r.value[0], r.value[1], suite, val);
@@ -117,7 +125,6 @@ var sort_function =  function(suite, val, l, r) {
 function normalize_card_val(current_suite, current_val, tsuite, tval) {
     if (current_suite == 'JOKER') {
         current_suite = 'Z';  
-        current_val = 15 + current_val;
     }
     if (current_val == tval) {
         var bonus = current_suite == tsuite ? 2 : 1;
@@ -189,12 +196,14 @@ function update_ui() {
     if (game.is_my_turn()) {
         $('#turn').text('YOUR TURN');
     } else {
-        $('#turn').text('NOT YOUR TURN');
+        var player = game.player();
+        $('#turn').text(player + '\'s turn');
     } 
     $('#draw').prop('disabled', !game.is_my_turn());
     $('#send').prop('disabled', !game.is_my_turn());
     $('#takeback').prop('disabled', !game.is_my_turn());
     $('#clear_table').prop('disabled', !game.is_my_turn());
+    $('#end_turn').prop('disabled', !game.is_my_turn());
 }
 
 
@@ -369,6 +378,8 @@ $(function() {
         var val =  $('#number_input').val();
         console.log(suite, val);
         sort_function = function(suite, val, l, r) {
+            var lid = l.id;
+            var rid = r.id;
             l = normalize_card_val(l.value[0], l.value[1], suite, val);
             r = normalize_card_val(r.value[0], r.value[1], suite, val);
             var result;
@@ -378,12 +389,44 @@ $(function() {
             }
             if (result == 0) {
                 // tie breaker
-                result = l.id - r.id;
+                result = lid - rid;
             }
             return result;
         }.bind(null, suite, val);
 
         update_ui();
         event.preventDefault();
+    });
+    $('#return_to_deck').on('click', function() {
+        var to_play = [];
+        for (var k in game.selected) {
+            if (game.selected[k]) {
+                to_play.push(k);
+                delete game.selected[k];
+            }
+        }
+        console.log(to_play);
+        conn.send( JSON.stringify({
+            action: 'RETURN_TO_DECK',
+            arg: to_play
+        }));
+
+        return false;
+    });
+
+    $('#sort_by_number').on('click', function() {
+        sort_function = function(l, r) {
+            var result;
+            result = l.value[0].charCodeAt(0) - r.value[0].charCodeAt(0);
+            if (l.value[1] != r.value[1]) {
+                result = l.value[1] - r.value[1];
+            }
+            if (result == 0) {
+                // tie breaker
+                result = l.id - r.id;
+            }
+            return result;
+        };
+        update_ui();
     });
 });

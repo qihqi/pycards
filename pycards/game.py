@@ -8,8 +8,8 @@ def make_standard_deck():
     for suite in ('C', 'D', 'H', 'S'):
         for val in range(2, 15):
             cards.append((suite, val))
-    cards.append(('JOKER', 1))
-    cards.append(('JOKER', 2))
+    cards.append(('JOKER', 20))
+    cards.append(('JOKER', 21))
     return cards
 
 STANDARD_DECK = make_standard_deck()
@@ -24,7 +24,8 @@ class Game(object):
         self._num_cards = num_cards_per_deck or NUM_CARDS_PER_DECK
         self.deck = []
         self._table = []
-        self._players = []
+        self._player_to_id = {}
+        self._players = set()
         self._player_hands = {}
         self.status = 'NEW'
         self._turn_number = 0
@@ -36,9 +37,11 @@ class Game(object):
         return self._turn_number
 
     def new_player(self, name):
-        self._players.append(name)
         if name not in self._player_hands:
             self._player_hands[name] = set()
+        if name not in self._player_to_id:
+            self._player_to_id[name] = len(self._player_to_id)
+        self._players.add(name)
 
     def start(self, num_decks):
         self.deck = list(range(num_decks * self._num_cards))
@@ -71,6 +74,10 @@ class Game(object):
                 del self._table[i]
         self._player_hands[player_id].update(cards)
 
+    def return_to_deck(self, player_id, card_ids):
+        self._player_hands[player_id] -= set(card_ids)
+        self.deck.extend(card_ids)
+
     def clean_table(self):
         del self._table[:]
 
@@ -84,7 +91,7 @@ class Game(object):
         return res
 
     def players(self):
-        return self._players
+        return sorted(self._players, key=self._player_to_id.get)
 
     def remove_player(self, player):
         self._players.remove(player)
