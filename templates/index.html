@@ -13,323 +13,105 @@
 	.item {
 		text-align: center;
 	}
+    #hand_area {
+       position: fixed;
+       bottom: 10%;
+       height: 30%;
+    }
+    #control_area {
+      position: fixed;
+      bottom: 0;
+      height: 10%;
+    }
+    #table_area {
+      position: fixed;
+      top: 0;
+      height: 60%;
+    }
+    #start_area {
+      position: fixed;
+      top: 15%;
+      left: 15%;
+      height: 60%;
+      text-align: center;
+    }
+    .center {
+      margin: auto;
+    }
 </style>
 	</head>
 	<body>
 		<div class="container">
-			<h4>Players</h4>
-			<div class="row" id="players">
-			</div>
-			<div class="row">
-				<input placeholder="NAME" id="name" type="text" />
-				<button id="connect">加入游戏</button>
-				<button id="disconnect">离开游戏</button>
-				<input id="num_decks" placeholder="几付牌" />
-				<button id="start">重新开始</button>
-				<button id="draw">Draw</button>
-			</div>
 
-			<div class="row">
-				<h3>桌面:</h3>
-				<button id="takeback">拿回来</button>
-			</div>
-			<div class="row" id="table">
-			</div>
+            <div id="start_area">
+                    <h2 class="center">欢迎来打牌</h2>
 
-			<hr />
+                    <p class="center"> <input placeholder="NAME" id="name" type="text" /> 
+                    <button id="connect">加入游戏</button> </p>
 
-			<div class="row" style="vertical-align:text-top">
-				<h3>手牌:  </h3>
-				<button id="send">出牌</button>
-				<form id="sort_form"> 
-					<span>主花色</span>
-					<input type="radio" class="suite_radio" name="suite" value="S"><span style="font-size:30px">&#9824</span></input>
-					<input type="radio"  class="suite_radio" name="suite" value="H"><span style="font-size:30px">&#9829</span></input>
-					<input type="radio" class="suite_radio"  name="suite" value="C"><span style="font-size:30px">&#9827</span></input>
-					<input type="radio" class="suite_radio"  name="suite" value="D"><span style="font-size:30px">&#9830</span></input>
-					<input type="radio" class="suite_radio"  name="suite" value="NT"><span>NT</span></input>
-					<span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
-					<input type="text" id="number_input" name="number" size=5></input>
-					<input type="submit" id="sort_hand" value="排序"></input>
-				</form>
-			</div>
-			<div class="row">
-				<div class="mygrid" id="hand"></div>
-			</div>
+                    <div id="show_player" style="display: none">
+                        成功！现有玩家：
+                        <p  class="center" id="starting_players"></p>
+                    </div>
+
+                    <p id="start_button_area" style="display: none" class="center">
+                        <input id="num_decks" placeholder="几付牌" />
+                        <button class="start" id="start">开始</button>
+                    </p>
+
+
+            </div>
+
+            <div id="play_area" style="display:none;">
+
+                <div id="table_area">
+                    <h4>Players:</h4>
+                    <div class="row" id="players">
+                    </div>
+                    <h4>牌组还剩：
+                        <span id="deck_cards"></span>
+                        张
+                    </h4>
+                    <h4 id="turn"></h4>
+                    <h3>桌面:</h3>
+                    <div class="row" id="table"></div>
+                    <hr />
+                </div>
+
+
+                <div id="hand_area">
+                    <h3>手牌:  </h3>
+                    <div class="mygrid" id="hand"></div>
+                    <hr />
+                </div>
+
+
+                <div id="control_area" style="vertical-align:text-top">
+                    <button id="new_game" class="start">新游戏</button>
+                    <button id="draw">摸牌</button>
+                    <button id="send">出牌</button>
+                    <button id="takeback">拿回来</button>
+                    <button id="clear_table">清空桌面</button>
+                    <button id="end_turn">结束回合</button>
+                    <button id="draw_continuesly">持续摸牌</button>
+                    <form id="sort_form"> 
+                        <span>主花色</span>
+                        <input type="radio" checked class="suite_radio" name="suite" value="S"><span style="font-size:30px">&#9824</span></input>
+                        <input type="radio"  class="suite_radio" name="suite" value="H"><span style="font-size:30px">&#9829</span></input>
+                        <input type="radio" class="suite_radio"  name="suite" value="C"><span style="font-size:30px">&#9827</span></input>
+                        <input type="radio" class="suite_radio"  name="suite" value="D"><span style="font-size:30px">&#9830</span></input>
+                        <input type="radio" class="suite_radio"  name="suite" value="NT"><span>NT</span></input>
+                        <span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
+                        <input type="text" id="number_input" name="number" size=5 value="2"></input>
+                        <input type="submit" id="sort_hand" value="排序"></input>
+                    </form>
+                </div>
+              </div>
 		</div>
 
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-		<script language="javascript" type="text/javascript">
-			var card_img_urls = [
-"https://deckofcardsapi.com/static/img/2C.png",
-"https://deckofcardsapi.com/static/img/3C.png",
-"https://deckofcardsapi.com/static/img/4C.png",
-"https://deckofcardsapi.com/static/img/5C.png",
-"https://deckofcardsapi.com/static/img/6C.png",
-"https://deckofcardsapi.com/static/img/7C.png",
-"https://deckofcardsapi.com/static/img/8C.png",
-"https://deckofcardsapi.com/static/img/9C.png",
-"https://deckofcardsapi.com/static/img/0C.png",
-"https://deckofcardsapi.com/static/img/JC.png",
-"https://deckofcardsapi.com/static/img/QC.png",
-"https://deckofcardsapi.com/static/img/KC.png",
-"https://deckofcardsapi.com/static/img/AC.png",
-"https://deckofcardsapi.com/static/img/2D.png",
-"https://deckofcardsapi.com/static/img/3D.png",
-"https://deckofcardsapi.com/static/img/4D.png",
-"https://deckofcardsapi.com/static/img/5D.png",
-"https://deckofcardsapi.com/static/img/6D.png",
-"https://deckofcardsapi.com/static/img/7D.png",
-"https://deckofcardsapi.com/static/img/8D.png",
-"https://deckofcardsapi.com/static/img/9D.png",
-"https://deckofcardsapi.com/static/img/0D.png",
-"https://deckofcardsapi.com/static/img/JD.png",
-"https://deckofcardsapi.com/static/img/QD.png",
-"https://deckofcardsapi.com/static/img/KD.png",
-"https://deckofcardsapi.com/static/img/AD.png",
-"https://deckofcardsapi.com/static/img/2H.png",
-"https://deckofcardsapi.com/static/img/3H.png",
-"https://deckofcardsapi.com/static/img/4H.png",
-"https://deckofcardsapi.com/static/img/5H.png",
-"https://deckofcardsapi.com/static/img/6H.png",
-"https://deckofcardsapi.com/static/img/7H.png",
-"https://deckofcardsapi.com/static/img/8H.png",
-"https://deckofcardsapi.com/static/img/9H.png",
-"https://deckofcardsapi.com/static/img/0H.png",
-"https://deckofcardsapi.com/static/img/JH.png",
-"https://deckofcardsapi.com/static/img/QH.png",
-"https://deckofcardsapi.com/static/img/KH.png",
-"https://deckofcardsapi.com/static/img/AH.png",
-"https://deckofcardsapi.com/static/img/2S.png",
-"https://deckofcardsapi.com/static/img/3S.png",
-"https://deckofcardsapi.com/static/img/4S.png",
-"https://deckofcardsapi.com/static/img/5S.png",
-"https://deckofcardsapi.com/static/img/6S.png",
-"https://deckofcardsapi.com/static/img/7S.png",
-"https://deckofcardsapi.com/static/img/8S.png",
-"https://deckofcardsapi.com/static/img/9S.png",
-"https://deckofcardsapi.com/static/img/0S.png",
-"https://deckofcardsapi.com/static/img/JS.png",
-"https://deckofcardsapi.com/static/img/QS.png",
-"https://deckofcardsapi.com/static/img/KS.png",
-"https://deckofcardsapi.com/static/img/AS.png",
-				"/static/joker.jpg",
-"https://deckofcardsapi.com/static/img/XX.png",
-				];
-
-			function check_hand_card() {
-				var card_id = $(this).attr('card_id');
-				game.selected[card_id] = $(this).is(':checked');
-
-			}
-			function make_card(card) {
-				var x = $('<div>');
-				var input = $('<input type="checkbox" class="hand_checkbox" >');
-				input.attr('card_id', card.id);
-				input.change(check_hand_card);
-				var card_img = $('<img height="120" >');
-				card_img.attr('src', card_img_urls[card.id % 54]);
-				x.append(input);
-				x.append(card_img);
-				return x;
-			}
-			var game = {
-				players: [],
-				table: [],
-				hand: [],
-				selected: {},
-			};  // game has player, table, and hand as property
-				
-			var sort_function = null;
-
-				function normalize_card_val(current_suite, current_val, tsuite, tval) {
-					if (current_suite == 'JOKER') {
-						current_suite = 'Z';  
-						current_val = 15 + current_val;
-					}
-					if (current_val == tval) {
-						var bonus = current_suite == tsuite ? 2 : 1;
-						current_suite = 'Z';
-						current_val = 13 + bonus;
-					}
-					if (tsuite != 'NT' && current_suite == tsuite) {
-						current_suite = 'Z';
-					}
-					return [current_suite, current_val];
-				}
-
-				function update_ui() {
-					$('#players').empty();
-					for (var i in game.players) {
-						var c = $('<div class="col-sm">') ;
-						c.text(game.players[i]);
-						$('#players').append(c);
-					}
-					$('#table').empty();
-					for (var i in game.table) {
-						var player_name = game.table[i][0];
-						var cards = game.table[i][1];
-						var col = $('<div class="col-sm">');
-						var slot = $('<div class="mygrid">');
-						for (var j in cards) {
-							var c = make_card(cards[j]);
-							slot.append(c);
-						}
-						col.append($('<p>' + player_name + '</p>'));
-						col.append(slot);
-						$('#table').append(col);
-					}
-					$('#hand').empty();
-					if (sort_function != null) {
-						game.hand.sort(sort_function);
-					}
-					for (var i in game.hand) {
-						var c = make_card(game.hand[i]);
-						$('#hand').append(c);
-					}
-				}
-
-                       
-
-			$(function() {
-				var conn = null;
-				function log(msg) {
-					var control = $('#log');
-					var date = new Date();
-					var date_prompt = '(' + date.toISOString().split('T')[1].slice(0,8) + ') ';
-					control.html(control.html() + date_prompt + msg + '<br/>');
-					control.scrollTop(control.scrollTop() + 1000);
-				}
-				function connect() {
-					disconnect();
-					var wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host;
-					conn = new WebSocket(wsUri);
-					var name = $('#name').val()
-					//log('Connecting...');
-					conn.onopen = function() {
-						//log('Connected.');
-						conn.send(
-							JSON.stringify({action: 'NEW_PLAYER', 
-								arg: name}));
-						update_ui();
-					};
-					conn.onmessage = function(e) {
-						var data = JSON.parse(e.data);
-						if ('error' in data) {
-							alert(data.error);
-						}
-						if ('players' in data) {
-							game.players = data.players
-						}
-						if ('table' in data) {
-							game.table = data.table
-						}
-						if ('hand' in data) {
-							game.hand = data.hand
-						}
-						update_ui();
-
-					};
-					conn.onclose = function() {
-						log('Disconnected.');
-						conn = null;
-						update_ui();
-					};
-				}
-				function disconnect() {
-					if (conn != null) {
-						//log('Disconnecting...');
-						conn.close();
-						conn = null;
-						name = 'UNKNOWN';
-						update_ui();
-					}
-				}
-				$('#connect').on('click', function() {
-					if (conn == null) {
-						connect();
-					} else {
-						disconnect();
-					}
-					update_ui();
-					return false;
-				});
-				$('#send').on('click', function() {
-					var to_play = [];
-					for (var k in game.selected) {
-						if (game.selected[k]) {
-							to_play.push(k);
-							delete game.selected[k];
-						}
-					}
-					console.log(to_play);
-					conn.send( JSON.stringify({
-						action: 'PLAY',
-						arg: to_play
-					}));
-
-					return false;
-				});
-				$('#text').on('keyup', function(e) {
-					if (e.keyCode === 13) {
-						$('#send').click();
-						return false;
-					}
-				});
-				$('#start').on('click', function() {
-					var t = { action: 'START', arg: 2 };
-					conn.send(JSON.stringify(t));
-					return false;
-				});
-				$('#draw').on('click', function() {
-					var t = { action: 'DRAW', arg: 1 };
-					conn.send(JSON.stringify(t));
-					return false;
-				});
-				$('#takeback').on('click', function() {
-					alert('not implemented');
-					var to_play = [];
-					for (var k in game.selected) {
-						if (game.selected[k]) {
-							to_play.push(k);
-							delete game.selected[k];
-						}
-					}
-					console.log(to_play);
-					conn.send( JSON.stringify({
-						action: 'PLAY',
-						arg: to_play
-					}));
-
-					return false;
-				});
-
-				$('#sort_form').on('submit', function(event) {
-					var data = new FormData(this); 
-					console.log(data);
-					var suite = $('.suite_radio:checked').val();
-					var val =  $('#number_input').val();
-					console.log(suite, val);
-					sort_function = function(suite, val, l, r) {
-						l = normalize_card_val(l.value[0], l.value[1], suite, val);
-						r = normalize_card_val(r.value[0], r.value[1], suite, val);
-						var result;
-						result = l[1] - r[1];
-						console.log('here1', result);
-						if (l[0] != r[0]) {
-							result = l[0].charCodeAt(0) - r[0].charCodeAt(0);
-							console.log('here2', result);
-						}
-						console.log(l, r, result);
-						return result;
-					}.bind(null, suite, val);
-
-					update_ui();
-					event.preventDefault();
-				});
-			});
-		</script>
+		<script language="javascript" type="text/javascript" src="/static/app.js"></script>
 	</body>
 </html>

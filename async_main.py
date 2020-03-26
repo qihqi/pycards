@@ -30,19 +30,29 @@ async def index(request):
             try:
                 parsed = json.loads(msg.data)
                 action, arg = parsed['action'], parsed['arg']
+                print(name, action, arg)
                 if action == 'NEW_PLAYER':
                     request.app['websockets'][arg] = ws_current
                     g.new_player(arg)
                     name = arg
                     broadcast_result['players'] = g.players()
+                    cur_result['player_id'] = len(g.players()) - 1
                     cur_result['table'] = g.table()
                     cur_result['hand'] = g.get_hand(name)
+                    cur_result['status'] = g.status
+                    cur_result['deck_cards'] = len(g.deck)
+                    cur_result['turn_number'] = g.turn_number()
                 elif action == 'START':
                     g.start(arg)
                     g.clean_table()
+                    broadcast_result['status'] = g.status
+                    broadcast_result['deck_cards'] = len(g.deck)
+                    broadcast_result['hand'] = []
+                    broadcast_result['table'] = g.table()
                 elif action == 'DRAW':
                     g.draw(name, arg)
                     cur_result['hand'] = g.get_hand(name)
+                    broadcast_result['deck_cards'] = len(g.deck)
                 elif action == 'CLEAN_TABLE':
                     g.clean_table()
                     broadcast_result['table'] = g.table()
@@ -51,6 +61,14 @@ async def index(request):
                     g.play(name, arg)
                     broadcast_result['table'] = g.table()
                     cur_result['hand'] = g.get_hand(name)
+                elif action == 'TAKE_BACK':
+                    arg = map(int, arg)
+                    g.take_back(name, arg)
+                    broadcast_result['table'] = g.table()
+                    cur_result['hand'] = g.get_hand(name)
+                elif action == 'END_TURN':
+                    g.incr_turn_number()
+                    broadcast_result['turn_number'] = g.turn_number()
                 else:
                     raise ValueError('{} is not valid action'.format(action))
             except ValueError as e:
@@ -64,6 +82,7 @@ async def index(request):
                         await ws.send_json(broadcast_result)
                 if cur_result:
                     await ws_current.send_json(cur_result)
+            print('result:', cur_result)
         else:
             break
 
