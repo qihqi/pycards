@@ -35,45 +35,33 @@ async def index(request):
                     request.app['websockets'][arg] = ws_current
                     g.new_player(arg)
                     name = arg
-                    broadcast_result['players'] = g.players()
-                    cur_result['player_id'] = len(g.players()) - 1
-                    cur_result['table'] = g.table()
+                    cur_result['player_id'] = g.get_player_id(name)
                     cur_result['hand'] = g.get_hand(name)
-                    cur_result['status'] = g.status
-                    cur_result['deck_cards'] = len(g.deck)
-                    cur_result['turn_number'] = g.turn_number()
                 elif action == 'START':
                     g.start(arg)
                     g.clean_table()
-                    broadcast_result['status'] = g.status
-                    broadcast_result['deck_cards'] = len(g.deck)
                     broadcast_result['hand'] = []
-                    broadcast_result['table'] = g.table()
                 elif action == 'DRAW':
                     g.draw(name, arg)
                     cur_result['hand'] = g.get_hand(name)
-                    broadcast_result['deck_cards'] = len(g.deck)
                 elif action == 'CLEAN_TABLE':
                     g.clean_table()
-                    broadcast_result['table'] = g.table()
                 elif action == 'PLAY':
                     arg = map(int, arg)
                     g.play(name, arg)
-                    broadcast_result['table'] = g.table()
                     cur_result['hand'] = g.get_hand(name)
                 elif action == 'TAKE_BACK':
                     arg = map(int, arg)
                     g.take_back(name, arg)
-                    broadcast_result['table'] = g.table()
                     cur_result['hand'] = g.get_hand(name)
                 elif action == 'END_TURN':
                     g.incr_turn_number()
-                    broadcast_result['turn_number'] = g.turn_number()
                 elif action == 'RETURN_TO_DECK':
                     arg = list(map(int, arg))
                     g.return_to_deck(name, arg)
-                    broadcast_result['deck_cards'] = len(g.deck)
                     cur_result['hand'] = g.get_hand(name)
+                elif action == 'END_DRAW':
+                    g.end_draw()
                 else:
                     raise ValueError('{} is not valid action'.format(action))
             except ValueError as e:
@@ -82,9 +70,9 @@ async def index(request):
                 traceback.print_exc()
                 await ws_current.send_json({'error': str(e)})
             else:
-                if broadcast_result:
-                    for ws in request.app['websockets'].values():
-                        await ws.send_json(broadcast_result)
+                broadcast_result.update(g.visible_state())
+                for ws in request.app['websockets'].values():
+                    await ws.send_json(broadcast_result)
                 if cur_result:
                     await ws_current.send_json(cur_result)
             print('result:', cur_result)
@@ -99,15 +87,43 @@ async def index(request):
     return ws_current
 
 
+async def test(request):
+    ws_current = web.WebSocketResponse()
+    ws_ready = ws_current.can_prepare(request)
+
+    assert ws_ready.ok
+
+    # Does this means I have connected in js?
+    await ws_current.prepare(request)
+    request.app['websockets_test'].append(ws_current)
+    while True:
+        msg = await ws_current.receive()
+        broadcast_result = {}
+        cur_result = {}
+        if msg.type == aiohttp.WSMsgType.text:
+            parsed = json.loads(msg.data)
+            action, arg = parsed['action'], parsed['arg']
+            if action == 'VERBATIM':
+                for w in request.app['websockets_test']:
+                    if w != ws_current:
+                        print('send', arg)
+                        await w.send_json(arg)
+        else:
+            break
+    pass
+
+
 
 async def init_app():
     app = web.Application()
     app['websockets'] = {}
+    app['websockets_test'] = []
     app['games'] = game.Game()
     app.on_shutdown.append(shutdown)
     aiohttp_jinja2.setup(
             app, loader=jinja2.FileSystemLoader('templates'))  # directories relative
     app.router.add_get('/', index)
+    app.router.add_get('/test', test)
     app.router.add_routes([web.static('/static', 'static')])
     return app
 

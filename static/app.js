@@ -59,12 +59,26 @@ var card_img_urls = [
 function check_hand_card() {
     var card_id = $(this).attr('card_id');
     game.selected[card_id] = $(this).is(':checked');
-
+    if ($(this).is(':checked')) {
+        game.selected[card_id] = true;
+    } else {
+        if (card_id in game.selected) {
+            delete game.selected[card_id];
+        }
+    }
+    update_ui();
 }
 
 function check_table_card() {
     var card_id = $(this).attr('card_id');
-    game.table_selected[card_id] = $(this).is(':checked');
+    if ($(this).is(':checked')) {
+        game.table_selected[card_id] = true;
+    } else {
+        if (card_id in game.table_selected) {
+            delete game.table_selected[card_id];
+        }
+    }
+    update_ui();
 }
 
 function make_card(card, is_hand) {
@@ -72,8 +86,14 @@ function make_card(card, is_hand) {
     var input = $('<input type="checkbox">');
     if (is_hand) {
         input.change(check_hand_card);
+        if (card.id in game.selected) {
+            input.prop('checked', true);
+        }
     } else {
         input.change(check_table_card);
+        if (card.id in game.table_selected) {
+            input.prop('checked', true);
+        }
     }
     input.attr('card_id', card.id);
     var card_img = $('<img height="120" >');
@@ -98,6 +118,8 @@ var game = {
     player_id: null,  // id of this player
     turn_number: null, // number of current turn    
 };  // game has player, table, and hand as property
+
+var auto_end_turn = false;
 
 game.is_my_turn = function() {
     return this.turn_number % this.players.length == this.player_id;
@@ -140,12 +162,12 @@ function normalize_card_val(current_suite, current_val, tsuite, tval) {
 function update_ui() {
     $('#players').empty();
     $('#starting_players').empty();
-    var players =  game.status == 'STARTED' ? $('#players') : $('#starting_players');
+    var players =  game.status == 'NEW' ? $('#starting_players') : $('#players');
     if (conn != null) {
       $('#show_player').show();
     }
 
-    if (game.status == 'STARTED') {
+    if (game.status != 'NEW' && conn != null) {
       $('#start_area').hide();
       $('#play_area').show();
     } else {
@@ -161,12 +183,14 @@ function update_ui() {
     if (game.status == 'NEW') {
       if (game.player_id == 0) {
         $('#start_button_area').show();
+      } else {
+        $('#start_button_area').hide();
       }
     }
     if (game.player_id == 0) {
-        $('#new_game').show();
+        $('.master').show();
     } else {
-        $('#new_game').hide();
+        $('.master').hide();
     }
     $('#table').empty();
     for (var i in game.table) {
@@ -199,11 +223,19 @@ function update_ui() {
         var player = game.player();
         $('#turn').text(player + '\'s turn');
     } 
-    $('#draw').prop('disabled', !game.is_my_turn());
-    $('#send').prop('disabled', !game.is_my_turn());
-    $('#takeback').prop('disabled', !game.is_my_turn());
-    $('#clear_table').prop('disabled', !game.is_my_turn());
-    $('#end_turn').prop('disabled', !game.is_my_turn());
+    $('div#control_area button').prop('disabled', !game.is_my_turn());
+    if (Object.keys(game.selected).length == 0) {
+        $('#send').prop('disabled', true);
+        $('#return_to_deck').prop('disabled', true);
+    }
+    if (Object.keys(game.table_selected).length == 0) {
+        $('#takeback').prop('disabled', true);
+    }
+    if (game.status == 'PLAYING') {
+        $('#draw').prop('disabled', true);
+        $('#return_to_deck').prop('disabled', true);
+        $('#draw_continuesly').prop('disabled', true);
+    }
 }
 
 
@@ -215,6 +247,9 @@ function continuesly_draw() {
         return;
     }
     if (game.deck_cards == 0) {
+        return;
+    }
+    if (game.status != 'STARTED') {
         return;
     }
     if (game.is_my_turn() && last_draw_turn < game.turn_number) {
@@ -253,27 +288,8 @@ function connect() {
         var data = JSON.parse(e.data);
         if ('error' in data) {
             alert(data.error);
-        }
-        if ('players' in data) {
-            game.players = data.players
-        }
-        if ('table' in data) {
-            game.table = data.table
-        }
-        if ('hand' in data) {
-            game.hand = data.hand
-        }
-        if ('deck_cards' in data) {
-            game.deck_cards = data.deck_cards;
-        }
-        if ('player_id' in data) {
-            game.player_id = data.player_id;
-        }
-        if ('turn_number' in data) {
-            game.turn_number = data.turn_number;
-        }
-        if ('status' in data) {
-            game.status = data.status;
+        } else {
+            Object.assign(game, data);
         }
         update_ui();
 
@@ -309,6 +325,13 @@ $(function() {
             arg: to_play
         }));
 
+        if (auto_end_turn) {
+            conn.send( JSON.stringify({
+                action: 'END_TURN',
+                arg: '' 
+            }));
+        }
+
         return false;
     });
     $('#text').on('keyup', function(e) {
@@ -326,6 +349,13 @@ $(function() {
     $('#draw').on('click', function() {
         var t = { action: 'DRAW', arg: 1 };
         conn.send(JSON.stringify(t));
+        if (auto_end_turn) {
+            conn.send( JSON.stringify({
+                action: 'END_TURN',
+                arg: '' 
+            }));
+        }
+
         return false;
     });
     $('#takeback').on('click', function() {
@@ -412,6 +442,16 @@ $(function() {
         }));
 
         return false;
+    });
+    $('#end_draw').on('click', function() {
+        conn.send(JSON.stringify({
+            action: 'END_DRAW',
+            arg: ''
+        }));
+    });
+
+    $('#auto_end_turn').change(function() {
+        auto_end_turn = $(this).is(':checked');
     });
 
     $('#sort_by_number').on('click', function() {

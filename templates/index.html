@@ -89,7 +89,9 @@
 
 
                 <div id="control_area" style="vertical-align:text-top">
-                    <button id="new_game" class="start">新游戏</button>
+                    <input type="checkbox" id="auto_end_turn">自动结束回合</input>
+                    <button id="new_game" class="start master">新游戏</button>
+                    <button id="end_draw" class="master">停止摸牌</button>
                     <button id="draw">摸牌</button>
                     <button id="send">出牌</button>
                     <button id="takeback">拿回来</button>
@@ -107,8 +109,8 @@
                         <span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
                         <input type="text" id="number_input" name="number" size=5 value="2"></input>
                         <input type="submit" id="sort_hand" value="排序"></input>
+                        <button id="sort_by_number">数字排序</button>
                     </form>
-                    <button id="sort_by_number">数字排序</button>
                 </div>
               </div>
 		</div>
