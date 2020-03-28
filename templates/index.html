@@ -14,20 +14,26 @@
 		text-align: center;
 	}
     #hand_area {
+       padding-left: 10px;
        position: fixed;
-       bottom: 10%;
+       bottom: 100px;
        height: 30%;
        overflow-y: auto;
+       width: 85%;
     }
     #control_area {
+       padding-left: 10px;
       position: fixed;
       bottom: 0;
-      height: 10%;
+      height: 100px;
+      width: 85%;
     }
     #table_area {
+       padding-left: 10px;
       position: fixed;
       top: 0;
       height: 60%;
+      width: 85%;
       overflow-y: auto;
     }
     #start_area {
@@ -37,83 +43,107 @@
       height: 60%;
       text-align: center;
     }
+
+     #chat_area {
+         position: fixed;
+         top: 0;
+         right: 0;
+         width: 15%;
+         height: 100%;
+     }
+#chat_text {
+    width: 100%;
+    height: 90%;
+    overflow-y: auto;
+}
+#chat_window {
+    width: 100%;
+    vertical-align: bottom;
+}
     .center {
       margin: auto;
     }
 </style>
 	</head>
 	<body>
-		<div class="container">
 
-            <div id="start_area">
-                    <h2 class="center">欢迎来打牌</h2>
+        <div id="start_area">
+                <h2 class="center">欢迎来打牌</h2>
 
-                    <p class="center"> <input placeholder="NAME" id="name" type="text" /> 
-                    <button id="connect">加入游戏</button> </p>
+                <p class="center"> <input placeholder="NAME" id="name" type="text" /> 
+                <button id="connect">加入游戏</button> </p>
 
-                    <div id="show_player" style="display: none">
-                        成功！现有玩家：
-                        <p  class="center" id="starting_players"></p>
-                    </div>
+                <div id="show_player" style="display: none">
+                    成功！现有玩家：
+                    <p  class="center" id="starting_players"></p>
+                </div>
 
-                    <p id="start_button_area" style="display: none" class="center">
-                        <input id="num_decks" placeholder="几付牌" />
-                        <button class="start" id="start">开始</button>
-                    </p>
+                <p id="start_button_area" style="display: none" class="center">
+                    <input id="num_decks" placeholder="几付牌" />
+                    <input id="num_cards_left" placeholder="几张底牌" />
+                    <button class="start" id="start">开始</button>
+                </p>
 
 
+        </div>
+
+        <div id="play_area" style="display:none;">
+
+            <div id="chat_area">
+                <p id="chat_text"></p>
+                <input id="chat_window"></input>
             </div>
 
-            <div id="play_area" style="display:none;">
-
-                <div id="table_area">
-                    <h4>Players:</h4>
-                    <div class="row" id="players">
-                    </div>
-                    <h4>牌组还剩：
-                        <span id="deck_cards"></span>
-                        张
-                    </h4>
-                    <h4 id="turn"></h4>
-                    <h3>桌面:</h3>
-                    <div class="row" id="table"></div>
-                    <hr />
+            <div id="table_area">
+                <h4>Players:</h4>
+                <div class="row" id="players">
                 </div>
+                <h4>牌组还剩：
+                    <span id="deck_cards"></span>
+                    张
+                </h4>
+                <h4 id="turn"></h4>
+                <h3>桌面:</h3>
+                <div class="row" id="table"></div>
+                <hr />
+            </div>
 
 
-                <div id="hand_area">
-                    <h3>手牌:  </h3>
-                    <div class="mygrid" id="hand"></div>
-                    <hr />
-                </div>
+            <div id="hand_area">
+                <h3>手牌 (<span id="hand_size"></span>):  </h3>
+                <div class="mygrid" id="hand"></div>
+                <hr />
+            </div>
 
 
-                <div id="control_area" style="vertical-align:text-top">
-                    <input type="checkbox" id="auto_end_turn">自动结束回合</input>
+            <div id="control_area" style="vertical-align:text-top">
+                <input type="checkbox" id="auto_end_turn" checked >自动结束回合</input>
+                <button id="draw" class="turn_control">摸牌</button>
+                <button id="send" class="turn_control">出牌</button>
+                <button id="takeback" class="turn_control">拿回来</button>
+                <button id="return_to_deck" class="turn_control">放回牌组</button>
+                <button id="clear_table" class="turn_control">清空桌面</button>
+                <button id="end_turn" class="turn_control">结束回合</button>
+                <button id="draw_continuesly" style="display:none;">持续摸牌</button>
+                <button id="take_turn">该我了</button>
+                <form id="sort_form"> 
+                    <span>主花色</span>
+                    <input type="radio" checked class="suite_radio" name="suite" value="S"><span style="font-size:30px">&#9824</span></input>
+                    <input type="radio"  class="suite_radio" name="suite" value="H"><span style="font-size:30px">&#9829</span></input>
+                    <input type="radio" class="suite_radio"  name="suite" value="C"><span style="font-size:30px">&#9827</span></input>
+                    <input type="radio" class="suite_radio"  name="suite" value="D"><span style="font-size:30px">&#9830</span></input>
+                    <input type="radio" class="suite_radio"  name="suite" value="NT"><span>NT</span></input>
+                    <span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
+                    <input type="text" id="number_input" name="number" size=5 value="2"></input>
+                    <input type="submit" id="sort_hand" value="排序"></input>
+                    <button id="sort_by_number">数字排序</button>
+                </form>
+                <div id="master_control" class="master">
                     <button id="new_game" class="start master">新游戏</button>
                     <button id="end_draw" class="master">停止摸牌</button>
-                    <button id="draw">摸牌</button>
-                    <button id="send">出牌</button>
-                    <button id="takeback">拿回来</button>
-                    <button id="return_to_deck">放回牌组</button>
-                    <button id="clear_table">清空桌面</button>
-                    <button id="end_turn">结束回合</button>
-                    <button id="draw_continuesly">持续摸牌</button>
-                    <form id="sort_form"> 
-                        <span>主花色</span>
-                        <input type="radio" checked class="suite_radio" name="suite" value="S"><span style="font-size:30px">&#9824</span></input>
-                        <input type="radio"  class="suite_radio" name="suite" value="H"><span style="font-size:30px">&#9829</span></input>
-                        <input type="radio" class="suite_radio"  name="suite" value="C"><span style="font-size:30px">&#9827</span></input>
-                        <input type="radio" class="suite_radio"  name="suite" value="D"><span style="font-size:30px">&#9830</span></input>
-                        <input type="radio" class="suite_radio"  name="suite" value="NT"><span>NT</span></input>
-                        <span>&nbsp; &nbsp;&nbsp;&nbsp;   主数字</span>
-                        <input type="text" id="number_input" name="number" size=5 value="2"></input>
-                        <input type="submit" id="sort_hand" value="排序"></input>
-                        <button id="sort_by_number">数字排序</button>
-                    </form>
                 </div>
-              </div>
-		</div>
+            </div>
+          </div>
 
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>

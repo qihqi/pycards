@@ -45,6 +45,10 @@ class Game(object):
     def incr_turn_number(self):
         self._turn_number += 1
 
+    def set_turn(self, player_name):
+        pid = self._player_to_id[player_name]
+        self._turn_number = pid
+
     def turn_number(self):
         return self._turn_number
 

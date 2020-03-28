@@ -38,8 +38,9 @@ async def index(request):
                     cur_result['player_id'] = g.get_player_id(name)
                     cur_result['hand'] = g.get_hand(name)
                 elif action == 'START':
-                    g.start(arg)
+                    g.start(arg['num_decks'])
                     g.clean_table()
+                    broadcast_result['draw_until'] = arg['draw_until']
                     broadcast_result['hand'] = []
                 elif action == 'DRAW':
                     g.draw(name, arg)
@@ -62,6 +63,10 @@ async def index(request):
                     cur_result['hand'] = g.get_hand(name)
                 elif action == 'END_DRAW':
                     g.end_draw()
+                elif action == 'TAKE_TURN':
+                    g.set_turn(name)
+                elif action == 'MESSAGE':
+                    broadcast_result['msg'] = arg
                 else:
                     raise ValueError('{} is not valid action'.format(action))
             except ValueError as e:

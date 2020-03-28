@@ -1,0 +1,143 @@
+<html>
+<body>
+<button id="join"> join</button>
+<audio id="received" autoplay></audio>
+
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script type="text/javascript">
+
+var conn = null;
+
+
+function connect() {
+    var url = 'ws://192.168.0.135:8080/test';
+    conn = new WebSocket(url);
+    conn.onopen = function() {
+        console.log('opened');
+    };
+    conn.onerror = console.log;
+    conn.onmessage = function(e) {
+        var data = JSON.parse(e.data);
+        console.log(data);
+        switch (data.type) {
+            case 'offer':
+               handleOfferMsg(data);
+               break;
+            case 'answer':
+               break;
+            case 'ice':
+               handleNewICECandidateMsg(data);
+               break;
+            default:
+               break;
+        }
+    }
+    conn.onclose = function() {
+        conn = null;
+    }
+}
+
+var constraints = {
+    audio: true,
+    video: false,
+};
+
+var myPeerConnection = null;
+
+function createPeerConnection() {
+  myPeerConnection = new RTCPeerConnection({
+      iceServers: [     // Information about ICE servers - Use your own!
+        {
+          urls: "stun:stun.stunprotocol.org"
+        }
+      ]
+  });
+
+  myPeerConnection.onicecandidate = function(event) {
+      if (event.candidate) {
+          conn.send(JSON.stringify({
+              action: 'VERBATIM',
+              arg: {
+                  type: 'ice',
+                  candidate: event.candidate
+              }
+          }));
+      }
+  };
+
+  myPeerConnection.ontrack = function(event) {
+      document.getElementById('received').srcObject = event.streams[0];
+  };
+
+  myPeerConnection.onnegotiationneeded = function() {
+      myPeerConnection.createOffer().then(function(offer) {
+          return myPeerConnection.setLocalDescription(offer);
+      })
+      .then(function() {
+          conn.send(JSON.stringify({
+              action: 'VERBATIM',
+              arg: {
+                type: 'offer',
+                sdp: myPeerConnection.localDescription,
+              }
+          }));
+      });
+  };
+}
+
+function handleOfferMsg(msg) {
+    // This is B
+    var localStream = null;
+    createPeerConnection();
+    var desc = new RTCSessionDescription(msg.sdp);
+    myPeerConnection.setRemoteDescription(desc).then(function() {
+        return navigator.mediaDevices.getUserMedia(constraints);
+    }).then(function(stream) {
+        localStream = stream;
+        localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+    }).then(function() {
+        return myPeerConnection.createAnswer();
+    }).then(function(answer) {
+        return myPeerConnection.setLocalDescription(answer);
+    }).then(function() {
+        conn.send(JSON.stringify({
+            action: 'VERBATIM',
+            arg: {
+                type: 'answer',
+                sdp: myPeerConnection.localDescription
+            }
+        }));
+    });
+}
+
+function handleNewICECandidateMsg(msg) {
+  var candidate = new RTCIceCandidate(msg.candidate);
+  myPeerConnection.addIceCandidate(candidate)
+    .catch(console.log);
+}
+
+function make_rtc() {
+
+    createPeerConnection();
+
+    navigator.mediaDevices.getUserMedia(constraints).then(function(localStream) {
+        localStream.getTracks().forEach( track => myPeerConnection.addTrack(track, localStream));
+    }).catch(console.log);
+    
+}
+
+$(document).ready(function() {
+    connect();
+    $('#join').click(function() {
+        make_rtc();
+        return false;
+    });
+});
+
+
+
+
+
+</script>
+</body>
+</html>

@@ -1,59 +1,59 @@
 
 var card_img_urls = [
-"https://deckofcardsapi.com/static/img/2C.png",
-"https://deckofcardsapi.com/static/img/3C.png",
-"https://deckofcardsapi.com/static/img/4C.png",
-"https://deckofcardsapi.com/static/img/5C.png",
-"https://deckofcardsapi.com/static/img/6C.png",
-"https://deckofcardsapi.com/static/img/7C.png",
-"https://deckofcardsapi.com/static/img/8C.png",
-"https://deckofcardsapi.com/static/img/9C.png",
-"https://deckofcardsapi.com/static/img/0C.png",
-"https://deckofcardsapi.com/static/img/JC.png",
-"https://deckofcardsapi.com/static/img/QC.png",
-"https://deckofcardsapi.com/static/img/KC.png",
-"https://deckofcardsapi.com/static/img/AC.png",
-"https://deckofcardsapi.com/static/img/2D.png",
-"https://deckofcardsapi.com/static/img/3D.png",
-"https://deckofcardsapi.com/static/img/4D.png",
-"https://deckofcardsapi.com/static/img/5D.png",
-"https://deckofcardsapi.com/static/img/6D.png",
-"https://deckofcardsapi.com/static/img/7D.png",
-"https://deckofcardsapi.com/static/img/8D.png",
-"https://deckofcardsapi.com/static/img/9D.png",
-"https://deckofcardsapi.com/static/img/0D.png",
-"https://deckofcardsapi.com/static/img/JD.png",
-"https://deckofcardsapi.com/static/img/QD.png",
-"https://deckofcardsapi.com/static/img/KD.png",
-"https://deckofcardsapi.com/static/img/AD.png",
-"https://deckofcardsapi.com/static/img/2H.png",
-"https://deckofcardsapi.com/static/img/3H.png",
-"https://deckofcardsapi.com/static/img/4H.png",
-"https://deckofcardsapi.com/static/img/5H.png",
-"https://deckofcardsapi.com/static/img/6H.png",
-"https://deckofcardsapi.com/static/img/7H.png",
-"https://deckofcardsapi.com/static/img/8H.png",
-"https://deckofcardsapi.com/static/img/9H.png",
-"https://deckofcardsapi.com/static/img/0H.png",
-"https://deckofcardsapi.com/static/img/JH.png",
-"https://deckofcardsapi.com/static/img/QH.png",
-"https://deckofcardsapi.com/static/img/KH.png",
-"https://deckofcardsapi.com/static/img/AH.png",
-"https://deckofcardsapi.com/static/img/2S.png",
-"https://deckofcardsapi.com/static/img/3S.png",
-"https://deckofcardsapi.com/static/img/4S.png",
-"https://deckofcardsapi.com/static/img/5S.png",
-"https://deckofcardsapi.com/static/img/6S.png",
-"https://deckofcardsapi.com/static/img/7S.png",
-"https://deckofcardsapi.com/static/img/8S.png",
-"https://deckofcardsapi.com/static/img/9S.png",
-"https://deckofcardsapi.com/static/img/0S.png",
-"https://deckofcardsapi.com/static/img/JS.png",
-"https://deckofcardsapi.com/static/img/QS.png",
-"https://deckofcardsapi.com/static/img/KS.png",
-"https://deckofcardsapi.com/static/img/AS.png",
+"/static/2C.png",
+"/static/3C.png",
+"/static/4C.png",
+"/static/5C.png",
+"/static/6C.png",
+"/static/7C.png",
+"/static/8C.png",
+"/static/9C.png",
+"/static/0C.png",
+"/static/JC.png",
+"/static/QC.png",
+"/static/KC.png",
+"/static/AC.png",
+"/static/2D.png",
+"/static/3D.png",
+"/static/4D.png",
+"/static/5D.png",
+"/static/6D.png",
+"/static/7D.png",
+"/static/8D.png",
+"/static/9D.png",
+"/static/0D.png",
+"/static/JD.png",
+"/static/QD.png",
+"/static/KD.png",
+"/static/AD.png",
+"/static/2H.png",
+"/static/3H.png",
+"/static/4H.png",
+"/static/5H.png",
+"/static/6H.png",
+"/static/7H.png",
+"/static/8H.png",
+"/static/9H.png",
+"/static/0H.png",
+"/static/JH.png",
+"/static/QH.png",
+"/static/KH.png",
+"/static/AH.png",
+"/static/2S.png",
+"/static/3S.png",
+"/static/4S.png",
+"/static/5S.png",
+"/static/6S.png",
+"/static/7S.png",
+"/static/8S.png",
+"/static/9S.png",
+"/static/0S.png",
+"/static/JS.png",
+"/static/QS.png",
+"/static/KS.png",
+"/static/AS.png",
 "/static/joker.jpg",
-"https://deckofcardsapi.com/static/img/XX.png",
+"/static/XX.png",
 ];
 
 function check_hand_card() {
@@ -117,9 +117,10 @@ var game = {
     status: '',
     player_id: null,  // id of this player
     turn_number: null, // number of current turn    
+    draw_until: 0, // stop automatic drawing until
 };  // game has player, table, and hand as property
 
-var auto_end_turn = false;
+var auto_end_turn = true;
 
 game.is_my_turn = function() {
     return this.turn_number % this.players.length == this.player_id;
@@ -151,7 +152,7 @@ function normalize_card_val(current_suite, current_val, tsuite, tval) {
     if (current_val == tval) {
         var bonus = current_suite == tsuite ? 2 : 1;
         current_suite = 'Z';
-        current_val = 13 + bonus;
+        current_val = 14 + bonus;
     }
     if (tsuite != 'NT' && current_suite == tsuite) {
         current_suite = 'Z';
@@ -210,6 +211,7 @@ function update_ui() {
     if (sort_function != null) {
         game.hand.sort(sort_function);
     }
+    $('#hand_size').text(game.hand.length);
     for (var i in game.hand) {
         var c = make_card(game.hand[i], true);
         $('#hand').append(c);
@@ -223,7 +225,7 @@ function update_ui() {
         var player = game.player();
         $('#turn').text(player + '\'s turn');
     } 
-    $('div#control_area button').prop('disabled', !game.is_my_turn());
+    $('.turn_control').prop('disabled', !game.is_my_turn());
     if (Object.keys(game.selected).length == 0) {
         $('#send').prop('disabled', true);
         $('#return_to_deck').prop('disabled', true);
@@ -246,7 +248,7 @@ function continuesly_draw() {
     if (!should_continuesly_draw) {
         return;
     }
-    if (game.deck_cards == 0) {
+    if (game.deck_cards <= game.draw_until) {
         return;
     }
     if (game.status != 'STARTED') {
@@ -288,6 +290,9 @@ function connect() {
         var data = JSON.parse(e.data);
         if ('error' in data) {
             alert(data.error);
+        } else if ('msg' in data) {
+            var t = $('#chat_text');
+            t.html(t.html() +'<br />' + data.msg);
         } else {
             Object.assign(game, data);
         }
@@ -342,7 +347,14 @@ $(function() {
     });
     $('button.start').on('click', function() {
         var num_decks = parseInt($('#num_decks').val());
-        var t = { action: 'START', arg: num_decks };
+        var draw_until = parseInt($('#num_cards_left').val());
+        var t = { 
+            action: 'START', 
+            arg: {
+                num_decks: num_decks, 
+                draw_until: draw_until 
+            }
+         };
         conn.send(JSON.stringify(t));
         return false;
     });
@@ -454,9 +466,28 @@ $(function() {
         auto_end_turn = $(this).is(':checked');
     });
 
+    $('#take_turn').click(function() {
+        conn.send(JSON.stringify({
+            action: 'TAKE_TURN',
+            arg: ''
+        }));
+    });
+
+    $('#chat_window').keyup(function(event) {
+        if (event.keyCode == 13 ) {
+            var name = $('#name').val();
+            conn.send(JSON.stringify( {
+                action: 'MESSAGE',
+                arg: name + ': ' + $('#chat_window').val()
+            }));
+            $('#chat_window').val('');
+        }
+    });
+
     $('#sort_by_number').on('click', function() {
         sort_function = function(l, r) {
             var result;
+            console.log('here');
             result = l.value[0].charCodeAt(0) - r.value[0].charCodeAt(0);
             if (l.value[1] != r.value[1]) {
                 result = l.value[1] - r.value[1];
@@ -468,5 +499,6 @@ $(function() {
             return result;
         };
         update_ui();
+        return false;
     });
 });
