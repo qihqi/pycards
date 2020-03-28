@@ -118,4 +118,12 @@ class Game(object):
     def end_draw(self):
         self.status = 'PLAYING'
 
+    def deal(self, number):
+        if not self.deck:
+            return 
+        if number >= len(self.deck):
+            number = len(self.deck) - 1
+        self._table.append(('DECK', set(self.deck[-number:])))
+        del self.deck[-number:]
+
 

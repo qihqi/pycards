@@ -1,3 +1,4 @@
+// encoding: utf-8
 
 var card_img_urls = [
 "/static/2C.png",
@@ -81,8 +82,45 @@ function check_table_card() {
     update_ui();
 }
 
+function card_text(card) {
+    var suite = {
+        C: '\u2663',
+        D: '\u2666', 
+        H: '\u2665',
+        S: '\u2660',
+    };
+    var value = card.value[1];
+    if (card.value[0] in suite) {
+        if (value == 14) {
+            value = 'A';
+        }
+        if (value == 10) {
+            value = '0';
+        }
+        if (value == 11) {
+            value = 'J'
+        }
+        if (value == 12) {
+            value = 'Q'
+        }
+        if (value == 13) {
+            value = 'K'
+        }
+        return  suite[card.value[0]] + value;
+    } else {
+        if (value == 20) {
+            return '小'
+        }
+        if (value == 21) {
+            return '大'
+        }
+    }
+}
+
 function make_card(card, is_hand) {
-    var x = $('<div>');
+    var x = $('<div class="one_card">');
+    var label = $('<label>');
+    label.text(card_text(card));
     var input = $('<input type="checkbox">');
     if (is_hand) {
         input.change(check_hand_card);
@@ -103,6 +141,7 @@ function make_card(card, is_hand) {
         input.trigger('change');
     }.bind(null, input));
     x.append(input);
+    x.append(label);
     x.append(card_img);
     return x;
 }
@@ -118,6 +157,7 @@ var game = {
     player_id: null,  // id of this player
     turn_number: null, // number of current turn    
     draw_until: 0, // stop automatic drawing until
+    points: {},
 };  // game has player, table, and hand as property
 
 var auto_end_turn = true;
@@ -163,6 +203,7 @@ function normalize_card_val(current_suite, current_val, tsuite, tval) {
 function update_ui() {
     $('#players').empty();
     $('#starting_players').empty();
+    var current_player = game.player();
     var players =  game.status == 'NEW' ? $('#starting_players') : $('#players');
     if (conn != null) {
       $('#show_player').show();
@@ -178,7 +219,13 @@ function update_ui() {
 
     for (var i in game.players) {
         var c = $('<div class="col-sm">') ;
-        c.text(game.players[i]);
+        var p;
+        if (game.players[i] == current_player) {
+            p = '<b>' + current_player + '</b>';
+        } else {
+            p = game.players[i];
+        }
+        c.html(p);
         players.append(c);
     }
     if (game.status == 'NEW') {
@@ -197,14 +244,18 @@ function update_ui() {
     for (var i in game.table) {
         var player_name = game.table[i][0];
         var cards = game.table[i][1];
-        var col = $('<div class="col-sm">');
+        var col = $('<div class="player_table">');
         var slot = $('<div class="mygrid">');
         for (var j in cards) {
             var c = make_card(cards[j], false);
             slot.append(c);
         }
-        col.append($('<p>' + player_name + '</p>'));
         col.append(slot);
+        col.append($('<span class="player_name">' + player_name + '</span>'));
+        var width = 50 * (cards.length + 1);
+        width += Math.min(20, 5 * player_name.length);
+        col.width(width);
+
         $('#table').append(col);
     }
     $('#hand').empty();
@@ -237,6 +288,11 @@ function update_ui() {
         $('#draw').prop('disabled', true);
         $('#return_to_deck').prop('disabled', true);
         $('#draw_continuesly').prop('disabled', true);
+    }
+    
+    $('#points').empty();
+    for (var p in game.points) {
+        $('#points').append($('<p>' + p + ': ' + game.points[p] + '</p>'));
     }
 }
 
@@ -347,12 +403,11 @@ $(function() {
     });
     $('button.start').on('click', function() {
         var num_decks = parseInt($('#num_decks').val());
-        var draw_until = parseInt($('#num_cards_left').val());
         var t = { 
             action: 'START', 
             arg: {
                 num_decks: num_decks, 
-                draw_until: draw_until 
+                draw_until: 0,
             }
          };
         conn.send(JSON.stringify(t));
@@ -476,12 +531,52 @@ $(function() {
     $('#chat_window').keyup(function(event) {
         if (event.keyCode == 13 ) {
             var name = $('#name').val();
+            var message = $('#chat_window').val();
             conn.send(JSON.stringify( {
                 action: 'MESSAGE',
-                arg: name + ': ' + $('#chat_window').val()
+                arg: name + ': ' + message,
             }));
             $('#chat_window').val('');
+            if (message.startsWith('!')) {
+                message = message.substr(1);
+                var tokens = message.split(' ');
+                var objs = [' function test() {'];
+                for (var t of tokens) {
+                    if (t.charAt(0).match(/[a-z]/i)) {
+                        objs.push(' game.points.' + t + ' ');
+                    } else {
+                        objs.push(t);
+                    }
+                }
+                objs.push('} \n');
+                objs.push('test');
+            }
+            var source = objs.join(' ');
+            console.log(source);
+            var func = eval(source);
+            func();
+            conn.send(JSON.stringify( {
+                action: 'SET_POINTS',
+                arg: game.points
+            }));
         }
+    });
+
+    $('#spread_cards').on('click', function() {
+        var count = $('#spread_count').val();
+        conn.send( JSON.stringify( {
+            action: 'SPREAD_CARDS',
+            arg: count
+        }));
+        return false;
+    });
+
+    $('#deal_from_deck').on('click', function() {
+        var count = $('#spread_count').val();
+        conn.send( JSON.stringify ({
+            action: 'DEAL',
+            arg: count,
+        }));
     });
 
     $('#sort_by_number').on('click', function() {

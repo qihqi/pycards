@@ -1,3 +1,4 @@
+import asyncio
 import json
 import aiohttp
 import aiohttp_jinja2
@@ -6,9 +7,21 @@ import jinja2
 
 from pycards import game
 
-# messages are tuples:
-# (DRAW, n)
-# (PLAY, list-of-cards)
+
+async def spread_cards(game, sockets, cards):
+    for i in range(cards):
+        if not game.deck:
+            break
+        waitables = []
+        for name, ws in sockets.items():
+            game.draw(name, 1)
+            waitables.append(ws.send_json( {
+                'hand': game.get_hand(name) 
+            }))
+        await asyncio.gather(*waitables)
+        await asyncio.sleep(1)
+
+
 
 async def index(request):
     ws_current = web.WebSocketResponse()
@@ -67,6 +80,14 @@ async def index(request):
                     g.set_turn(name)
                 elif action == 'MESSAGE':
                     broadcast_result['msg'] = arg
+                elif action == 'SPREAD_CARDS':
+                    count = int(arg)
+                    await spread_cards(g, request.app['websockets'], count)
+                elif action == 'DEAL':
+                    count = int(arg)
+                    g.deal(count)
+                elif action == 'SET_POINTS':
+                    broadcast_result['points'] = arg
                 else:
                     raise ValueError('{} is not valid action'.format(action))
             except ValueError as e:
