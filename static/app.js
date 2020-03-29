@@ -348,7 +348,7 @@ function connect() {
             alert(data.error);
         } else if ('msg' in data) {
             var t = $('#chat_text');
-            t.html(t.html() +'<br />' + data.msg);
+            t.append($('<p>' + data.msg + '</p>'));
         } else {
             Object.assign(game, data);
         }
@@ -411,6 +411,19 @@ $(function() {
             }
          };
         conn.send(JSON.stringify(t));
+        return false;
+    });
+    $('#new_game').on('click', function() {
+        var num_decks = parseInt($('#spread_count').val()) || parseInt($('#num_decks').val());
+        var t = { 
+            action: 'START', 
+            arg: {
+                num_decks: num_decks, 
+                draw_until: 0,
+            }
+         };
+        conn.send(JSON.stringify(t));
+        $('#pread_count').val('');
         return false;
     });
     $('#draw').on('click', function() {
@@ -568,6 +581,7 @@ $(function() {
             action: 'SPREAD_CARDS',
             arg: count
         }));
+        $('#spread_count').val('');
         return false;
     });
 
@@ -577,6 +591,8 @@ $(function() {
             action: 'DEAL',
             arg: count,
         }));
+        $('#spread_count').val('');
+        return false;
     });
 
     $('#sort_by_number').on('click', function() {

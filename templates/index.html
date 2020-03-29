@@ -60,7 +60,9 @@
      }
 #chat_text {
     width: 100%;
-    overflow-y: auto;
+    height: 90%;
+    overflow-y: scroll;
+    float: bottom;
 }
 #chat_window {
     width: 100%;
@@ -97,7 +99,7 @@
 
             <div id="chat_area">
                 <div id="points"></div> 
-                <p id="chat_text"></p>
+                <div id="chat_text"></div>
                 <input id="chat_window" placeholder="请尬聊"></input>
             </div>
 
@@ -146,7 +148,7 @@
                     <button id="sort_by_number">数字排序</button>
                 </form>
                 <div id="master_control" class="master">
-                    <button id="new_game" class="start master">新游戏</button>
+                    <button id="new_game" class="master">新游戏</button>
                     <button id="end_draw" class="master">停止摸牌</button>
                     <button id="spread_cards" class="master">发牌</button>
                     <button id="deal_from_deck" class="master">翻牌</button>
