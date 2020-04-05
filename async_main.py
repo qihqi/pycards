@@ -69,7 +69,7 @@ async def index(request):
                     g.take_back(name, arg)
                     cur_result['hand'] = g.get_hand(name)
                 elif action == 'END_TURN':
-                    g.incr_turn_number()
+                    g.end_turn(name)
                 elif action == 'RETURN_TO_DECK':
                     arg = list(map(int, arg))
                     g.return_to_deck(name, arg)

@@ -154,8 +154,8 @@ var game = {
     table_selected: {},
     deck_cards: 0,
     status: '',
-    player_id: null,  // id of this player
-    turn_number: null, // number of current turn    
+    my_name: null,  // name of this player
+    current_player: null, // current player
     draw_until: 0, // stop automatic drawing until
     points: {},
 };  // game has player, table, and hand as property
@@ -163,11 +163,7 @@ var game = {
 var auto_end_turn = true;
 
 game.is_my_turn = function() {
-    return this.turn_number % this.players.length == this.player_id;
-}
-
-game.player = function() {
-    return this.players[this.turn_number % this.players.length];
+    return this.current_player == this.my_name
 }
 
 var sort_function =  function(suite, val, l, r) {
@@ -203,7 +199,7 @@ function normalize_card_val(current_suite, current_val, tsuite, tval) {
 function update_ui() {
     $('#players').empty();
     $('#starting_players').empty();
-    var current_player = game.player();
+    var current_player = game.current_player;
     var players =  game.status == 'NEW' ? $('#starting_players') : $('#players');
     if (conn != null) {
       $('#show_player').show();
@@ -273,8 +269,7 @@ function update_ui() {
     if (game.is_my_turn()) {
         $('#turn').text('YOUR TURN');
     } else {
-        var player = game.player();
-        $('#turn').text(player + '\'s turn');
+        $('#turn').text(game.current_player + '\'s turn');
     } 
     $('.turn_control').prop('disabled', !game.is_my_turn());
     if (Object.keys(game.selected).length == 0) {
@@ -339,6 +334,7 @@ function connect() {
             JSON.stringify({action: 'NEW_PLAYER', 
                 arg: name}));
     };
+    game.my_name = name;
     conn.onerror = function(e) {
       alert('Failed to connect! Please retry.');
     };
