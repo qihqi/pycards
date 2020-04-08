@@ -158,6 +158,7 @@ var game = {
     current_player: null, // current player
     draw_until: 0, // stop automatic drawing until
     points: {},
+    waiting_players: [],
 };  // game has player, table, and hand as property
 
 var auto_end_turn = true;
@@ -221,6 +222,13 @@ function update_ui() {
         } else {
             p = game.players[i];
         }
+        c.html(p);
+        players.append(c);
+    }
+
+    for (var i in game.waiting_players) {
+        var c = $('<div class="col-sm">') ;
+        var p = game.waiting_players[i] + '(waiting)';
         c.html(p);
         players.append(c);
     }

@@ -33,7 +33,10 @@ async def index(request):
     # Does this means I have connected in js?
     await ws_current.prepare(request)
     g = request.app['games']
+    waiting_players = request.app['waiting']
     name = None
+
+    is_playing = True
 
     while True:
         msg = await ws_current.receive()
@@ -44,12 +47,19 @@ async def index(request):
                 parsed = json.loads(msg.data)
                 action, arg = parsed['action'], parsed['arg']
                 print(name, action, arg)
+                if not is_playing:
+                    continue
                 if action == 'NEW_PLAYER':
                     request.app['websockets'][arg] = ws_current
-                    g.new_player(arg)
                     name = arg
-                    cur_result['player_id'] = g.get_player_id(name)
-                    cur_result['hand'] = g.get_hand(name)
+                    if g.status == 'NEW':
+                        g.new_player(arg)
+                        cur_result['hand'] = g.get_hand(name)
+                        cur_result['player_id'] = g.get_player_id(name)
+                    else:
+                        waiting_players.append(arg)
+                        broadcast_result['waiting'] = waiting_players
+                        is_playing = False
                 elif action == 'START':
                     g.start(arg['num_decks'])
                     g.clean_table()
@@ -144,6 +154,7 @@ async def init_app():
     app = web.Application()
     app['websockets'] = {}
     app['websockets_test'] = []
+    app['waiting'] = []
     app['games'] = game.Game()
     app.on_shutdown.append(shutdown)
     aiohttp_jinja2.setup(
