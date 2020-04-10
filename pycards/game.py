@@ -281,29 +281,33 @@ class GameRoom(GameObj):
             self.game.clean_table()
         elif command == 'PLAY':
             assert self.game
-            self.game.play(player.name, arg_dict['cards'])
+            cards = self.game.play(player.name, arg_dict['cards'])
+            arg_dict['cards'] = cards
         elif command == 'TAKE_BACK':
             assert self.game
-            self.game.take_back(player.name, arg_dict['cards'])
+            cards = self.game.take_back(player.name, arg_dict['cards'])
+            arg_dict['cards'] = cards
         elif command == 'END_TURN':
             assert self.game
             self.end_turn(player)
         elif command == 'RETURN_TO_DECK':
             assert self.game
-            self.game.return_to_deck(player.name, arg_dict['cards'])
+            cards = self.game.return_to_deck(player.name, arg_dict['cards'])
+            arg_dict['cards'] = cards
         elif command == 'TAKE_TURN':
             assert self.game
             self.set_turn(player)
         elif command == 'DEAL':
             assert self.game
-            self.game.deal(arg_dict['num_cards'])
+            return_val = self.game.deal(arg_dict['num_cards'])
         elif command == 'ADD_POINTS':
             player.score += arg_dict['points']
         elif command == 'GET_STATE':
             return_val = self
         else:
             raise ValueError('{} is not valid command'.format(command))
-        return return_val
+        corrected_statement = (player, command, arg_dict)
+        return return_val, corrected_statement
 
 
 class ModelEncoder(json.JSONEncoder):

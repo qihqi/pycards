@@ -34,7 +34,7 @@ class GameTest(unittest.TestCase):
             json.dumps(room, cls=game.ModelEncoder),
         '{"players": [], "game": null, "observers": [{"name": "a", "team": 0, "score": 0, "total_score": 0}], "current_player": null}')
         room.handle_command(player, 'START', {'num_decks': 2})
-        res = room.handle_command(player, 'DRAW', {'num_cards': 2})
+        res, _ = room.handle_command(player, 'DRAW', {'num_cards': 2})
         room.handle_command(player, 'PLAY', {'cards': res['drawed']})
         print(json.dumps(room, cls=game.ModelEncoder))
 
