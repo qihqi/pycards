@@ -65,11 +65,11 @@ class Card {
     }
 
     get suite() {
-        return Math.floor(this._id / 13);
+        return Math.floor(this._val / 13);
     }
 
-    get value {
-        num = this._id % 13 + 2;
+    get value() {
+        let num = this._val % 13 + 2;
         if (this.suite == 4) {
             // joker
             num += 20;
@@ -408,12 +408,10 @@ var game = {
 function default_sort_func(suite, val, l, r) {
     l = normalize_card_val(l, suite, val);
     r = normalize_card_val(r, suite, val);
-    var result;
-    result = l[1] - r[1];
     if (l[0] != r[0]) {
-        result = l[0] - r[0];
+        return l[0] - r[0];
     }
-    return result;
+    return l[1] - r[1];
 }
 
 var sort_function = default_sort_func.bind(null, 'S', 2);
@@ -685,19 +683,12 @@ $(function() {
 
     $('#sort_by_number').on('click', function() {
         sort_function = function(l, r) {
-            l = l % 54;
-            r = r % 54;
-            let lvalue = l % 13;
-            let lsuite = l / 13;
-            let rvalue = r % 13;
-            let rsuite = r / 13;
-            var result;
-            console.log('here');
-            result = lsuite - rsuite;
-            if (lvalue != rvalue) {
-                result = lvalue - rvalue;
+            let c1 = new Card(l);
+            let c2 = new Card(r);
+            if (l.value != r.value) {
+                return l.value - r.value;
             }
-            return result;
+            return l.suite - r.suite;
         };
         update_ui();
         return false;
