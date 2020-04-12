@@ -1,146 +1,10 @@
+import itertools
 import json
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Set, Iterable, Optional, Tuple
 
 NUM_CARDS_PER_DECK = 54
-
-
-def make_standard_deck():
-    cards = []
-    for suite in ('C', 'D', 'H', 'S'):
-        for val in range(2, 15):
-            cards.append((suite, val))
-    cards.append(('JOKER', 20))
-    cards.append(('JOKER', 21))
-    return cards
-
-STANDARD_DECK = make_standard_deck()
-
-def get_card(cid):
-    return {'id': cid, 'value': STANDARD_DECK[cid % 54]}
-
-
-class Game(object):
-
-    # Status: NEW -> STARTED -> PLAYING
-
-    def __init__(self, num_cards_per_deck=None):
-        self._num_cards = num_cards_per_deck or NUM_CARDS_PER_DECK
-        self.deck = []
-        self._table = []
-        self._player_to_id = {}
-        self._players = []
-        self._player_hands = {}
-        self.status = 'NEW'
-        self._turn_number = 0
-        self._current_player = None
-
-    def visible_state(self):  # what everyone can see
-        return {
-            'players': self.players(),
-            'table': self.table(),
-            'deck_cards': len(self.deck),
-            'current_player': self._current_player,
-            'status': self.status,
-        }
-
-
-    def end_turn(self, player_name):
-        if player_name == self._current_player:
-            self._turn_number += 1
-            self._turn_number = self._turn_number % len(self._players)
-            self._current_player = self._players[self._turn_number]
-            
-
-    def set_turn(self, player_name):
-        pid = self._player_to_id[player_name]
-        self._turn_number = pid
-        self._current_player = player_name
-
-    def turn_number(self):
-        return self._turn_number
-
-    def current_player(self):
-        return self._current_player
-
-    def new_player(self, name):
-        if name not in self._player_hands:
-            self._player_hands[name] = set()
-        if name not in self._player_to_id:
-            self._player_to_id[name] = len(self._player_to_id)
-        self._players.append(name)
-        if self._current_player is None:
-            self._current_player = name
-
-    def get_player_id(self, name):
-        return self._player_to_id[name]
-
-    def start(self, num_decks):
-        self.deck = list(range(num_decks * self._num_cards))
-        random.shuffle(self.deck)
-        self.status = 'STARTED'
-        self._turn_number = 0
-        self._player_hands = {name: set() for name in self._players}
-        if self._players:
-            self._current_player = self._players[0]
-
-    def draw(self, name, count):
-        if count > len(self.deck):
-            raise ValueError('draw to many')
-        cards = self.deck[-count:]
-        self._player_hands[name].update(cards)
-        del self.deck[-count:]
-        return cards
-
-    def play(self, name, card_ids):
-        card_ids = set(card_ids)
-        print(card_ids)
-        if not card_ids: 
-            return
-        self._player_hands[name] -= card_ids
-        self._table.append((name, card_ids))
-
-    def take_back(self, name, card_ids):
-        cards = set(card_ids)
-        for i, (k, v) in enumerate(self._table):
-            v -= cards
-            if not v:
-                del self._table[i]
-        self._player_hands[name].update(cards)
-
-    def return_to_deck(self, name, card_ids):
-        self._player_hands[name] -= set(card_ids)
-        self.deck.extend(card_ids)
-
-    def clean_table(self):
-        del self._table[:]
-
-    def get_hand(self, name):
-        return list(map(get_card, self._player_hands[name]))
-
-    def table(self):
-        res = []
-        for k, v in self._table:
-            res.append((k, list(map(get_card, v))))
-        return res
-
-    def players(self):
-        return self._players
-
-    def remove_player(self, player):
-        self._players.remove(player)
-
-    def end_draw(self):
-        self.status = 'PLAYING'
-
-    def deal(self, number):
-        if not self.deck:
-            return 
-        if number >= len(self.deck):
-            number = len(self.deck) - 1
-        self._table.append(('DECK', set(self.deck[-number:])))
-        del self.deck[-number:]
 
 
 class GameObj(object):
@@ -159,6 +23,7 @@ class GameState(GameObj):
 
     def __init__(self, num_decks: int, players: Iterable[str]):
         self._deck = list(range(num_decks * 54))
+        random.shuffle(self._deck)
         self._table = []
         self._hands = {name: set() for name in players}
         self._table_players = []
@@ -184,25 +49,21 @@ class GameState(GameObj):
 
     def play(self, name: str, card_ids: Iterable[int]) -> Set[int]:
         card_ids = set(card_ids)
-        if not card_ids:
-            return card_ids
         played = self._hands[name] & card_ids
-        self._table.append(list(played))
-        self._table_players.append(name)
-        self._hands[name] -= played
+        if played:
+            self._table.append(list(played))
+            self._table_players.append(name)
+            self._hands[name] -= played
         return played
 
     def take_back(self, name: str, card_ids: Iterable[int]) -> Set[int]:
-        cards = set(card_ids)
-        removed_cards = set()
-        for ll in self._table:
-            for k in ll:
-                if k in cards:
-                    ll.remove(k)
-                    removed_cards.add(k)
-        self._table = list(filter(None, self._table))
-        self._hands[name].update(removed_cards)
-        return removed_cards
+        cards = set(card_ids)  # cards to remove
+        all_table_cards = set(itertools.chain(*self._table))
+        cards = cards & all_table_cards
+        self._table = [
+            list(filter(lambda x: x not in cards, ll)) for ll in self._table
+        ]
+        self._hands[name].update(cards)
 
     def return_to_deck(self, name: str, card_ids: Iterable[int]) -> Set[int]:
         card_ids = self._hands[name] & set(card_ids)
@@ -221,6 +82,7 @@ class GameState(GameObj):
             number = len(self._deck)
         res = self._deck[-number:]
         self._table.append(res)
+        self._table_players.append('DECK')
         del self._deck[-number:]
         return res
 
@@ -237,17 +99,23 @@ class Player(GameObj):
 
 class GameRoom(GameObj):
 
-    players: List[Player] = []
+    players: List[Player] = field(default_factory=list)
     game: Optional[GameState] = None
-    observers: List[Player] = []
+    observers: List[Player] = field(default_factory=list)
     _current_turn: int = 0
-    _last_turns: List[Tuple[str, List[int]]] = []
+    _last_turns: List[Tuple[str, List[int]]] = field(default_factory=list)
 
     _exposed = ['players', 'game', 'observers', 'current_player']
 
+    def __init__(self):
+        self.players = []
+        self.observers = []
+        self._last_turns = []
 
     def new_game(self, num_decks):
         self.players += self.observers
+        for p in self.players:
+            p.score = 0
         self.observers = []
         self.game = GameState(num_decks, [p.name for p in self.players])
         self._current_turn = 0
@@ -268,46 +136,78 @@ class GameRoom(GameObj):
         return None
 
     def handle_command(self, player: Player, command: str, arg_dict: Dict):
-        return_val = None  # type: object
-        if command == 'JOIN':
-            self.observers.append(player)
-        elif command == 'START':
+        reply_result = None
+        bcommand = command
+        barg = arg_dict
+        bname = player.name
+
+        if command == 'START':
             self.new_game(arg_dict['num_decks'])
+            bcommand = 'SET_STATE'
+            barg = { 'room': self, 'hand': []}
         elif command == 'DRAW':
             assert self.game
-            return_val = {'drawed': self.game.draw(player.name, arg_dict['num_cards'])}
+            res = self.game.draw(player.name, arg_dict['num_cards'])
+            reply_result = {
+               'name': player.name,
+               'action': 'DRAWED',
+               'arg': res,
+            }
         elif command == 'CLEAN_TABLE':
             assert self.game
             self.game.clean_table()
         elif command == 'PLAY':
             assert self.game
             cards = self.game.play(player.name, arg_dict['cards'])
-            arg_dict['cards'] = cards
+            barg = {'cards': cards}
         elif command == 'TAKE_BACK':
             assert self.game
-            cards = self.game.take_back(player.name, arg_dict['cards'])
-            arg_dict['cards'] = cards
+            self.game.take_back(player.name, arg_dict['cards'])
+            bcommand = 'SET_STATE'
+            barg = { 'room': self,}
+            reply_result = {
+                'name': player.name,
+                'action': 'SET_STATE',
+                'arg': { 'hand': self.game.hand(player.name) }
+            }
         elif command == 'END_TURN':
             assert self.game
             self.end_turn(player)
+            bcommand = 'TAKE_TURN'
+            bname = self.current_player.name
         elif command == 'RETURN_TO_DECK':
             assert self.game
             cards = self.game.return_to_deck(player.name, arg_dict['cards'])
-            arg_dict['cards'] = cards
+            barg = {'num_cards': len(cards)}
         elif command == 'TAKE_TURN':
             assert self.game
             self.set_turn(player)
         elif command == 'DEAL':
             assert self.game
-            return_val = self.game.deal(arg_dict['num_cards'])
+            self.game.deal(arg_dict['num_cards'])
+            bcommand = 'SET_STATE'
+            barg = { 'room': self, 'hand': self.game.hand(player.name) }
         elif command == 'ADD_POINTS':
             player.score += arg_dict['points']
         elif command == 'GET_STATE':
-            return_val = self
+            reply_result = {
+                'name': player.name,
+                'action': 'SET_STATE',
+                'arg': {
+                    'room': self,
+                    'hand': self.game.hand(player.name)
+                }
+            }
         else:
             raise ValueError('{} is not valid command'.format(command))
-        corrected_statement = (player, command, arg_dict)
-        return return_val, corrected_statement
+
+        broadcast_result = {
+            'name': bname,
+            'action': bcommand,
+            'arg': barg
+        }
+
+        return reply_result, broadcast_result
 
 
 class ModelEncoder(json.JSONEncoder):
@@ -321,10 +221,6 @@ class ModelEncoder(json.JSONEncoder):
         if isinstance(obj, GameObj):
             res = {key: getattr(obj, key) for key in obj._exposed if not key.startswith('_')}
             return res
+        if isinstance(obj, set):
+            return list(obj)
         return super(ModelEncoder, self).default(obj)
-
-
-
-
-
-

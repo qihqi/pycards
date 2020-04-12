@@ -1,4 +1,5 @@
 // encoding: utf-8
+'use strict';
 
 var card_img_urls = [
 "/static/2C.png",
@@ -57,40 +58,78 @@ var card_img_urls = [
 "/static/XX.png",
 ];
 
-function check_hand_card() {
-    var card_id = $(this).attr('card_id');
-    game.selected[card_id] = $(this).is(':checked');
-    if ($(this).is(':checked')) {
-        game.selected[card_id] = true;
-    } else {
-        if (card_id in game.selected) {
-            delete game.selected[card_id];
-        }
+class Card {
+    constructor(numeric_val) {
+        this._id = numeric_val;
+        this._val = Math.floor(this._id % 54);
     }
-    update_ui();
+
+    get suite() {
+        return Math.floor(this._id / 13);
+    }
+
+    get value {
+        num = this._id % 13 + 2;
+        if (this.suite == 4) {
+            // joker
+            num += 20;
+        }
+        return num;
+    }
+
+    get card_text() {
+        var suite = [
+            '\u2663',
+            '\u2666', 
+            '\u2665',
+            '\u2660',
+            ];
+        let value = this.value;
+        if (this.suite < 4) {
+            if (value == 14) {
+                value = 'A';
+            }
+            if (value == 10) {
+                value = '0';
+            }
+            if (value == 11) {
+                value = 'J'
+            }
+            if (value == 12) {
+                value = 'Q'
+            }
+            if (value == 13) {
+                value = 'K'
+            }
+            return  suite[this.suite] + value;
+        } else {
+            if (value == 22) {
+                return '小'
+            }
+            if (value == 23) {
+                return '大'
+            }
+        }
+
+    }
 }
 
-function check_table_card() {
-    var card_id = $(this).attr('card_id');
-    if ($(this).is(':checked')) {
-        game.table_selected[card_id] = true;
-    } else {
-        if (card_id in game.table_selected) {
-            delete game.table_selected[card_id];
-        }
-    }
-    update_ui();
-}
+
 
 function card_text(card) {
-    var suite = {
-        C: '\u2663',
-        D: '\u2666', 
-        H: '\u2665',
-        S: '\u2660',
-    };
-    var value = card.value[1];
-    if (card.value[0] in suite) {
+    if (typeof card === 'string') {
+        card = parseInt(card);
+    }
+    var suite = [
+        '\u2663',
+        '\u2666', 
+        '\u2665',
+        '\u2660',
+        ];
+    card = card % 54;
+    var value = card % 13 + 2;
+    var s = Math.floor( card / 13);
+    if (s < 4) {
         if (value == 14) {
             value = 'A';
         }
@@ -106,12 +145,12 @@ function card_text(card) {
         if (value == 13) {
             value = 'K'
         }
-        return  suite[card.value[0]] + value;
+        return  suite[s] + value;
     } else {
-        if (value == 20) {
+        if (value == 2) {
             return '小'
         }
-        if (value == 21) {
+        if (value == 3) {
             return '大'
         }
     }
@@ -123,22 +162,15 @@ function make_card(card, is_hand) {
     label.text(card_text(card));
     var input = $('<input type="checkbox">');
     if (is_hand) {
-        input.change(check_hand_card);
-        if (card.id in game.selected) {
-            input.prop('checked', true);
-        }
+        input.addClass('hand_card');
     } else {
-        input.change(check_table_card);
-        if (card.id in game.table_selected) {
-            input.prop('checked', true);
-        }
+        input.addClass('table_card');
     }
-    input.attr('card_id', card.id);
+    input.attr('card_id', card);
     var card_img = $('<img height="120" >');
-    card_img.attr('src', card_img_urls[card.id % 54]);
+    card_img.attr('src', card_img_urls[card % 54]);
     card_img.click(function(input) { 
         input.prop('checked', !input.is(':checked'));
-        input.trigger('change');
     }.bind(null, input));
     x.append(input);
     x.append(label);
@@ -147,66 +179,283 @@ function make_card(card, is_hand) {
 }
 
 var game = {
-    players: [],
-    table: [],
+    room: {
+        game: null,
+        players: [],
+        observers: [],
+        current_player: null, // current player
+    },
+
     hand: [],
-    selected: {},
-    table_selected: {},
-    deck_cards: 0,
-    status: '',
     my_name: null,  // name of this player
-    current_player: null, // current player
-    draw_until: 0, // stop automatic drawing until
-    points: {},
-    waiting_players: [],
-};  // game has player, table, and hand as property
+    my_team: null,
+    ws: null,
+    auto_end_turn: true,
 
-var auto_end_turn = true;
+    join(name) {
+        if (this.ws != null) {
+            console.log('already connected.');
+            return;
+        }
+        let wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host;
+        this.ws = new WebSocket(wsUri);
+        var self = this;
+        this.ws.onopen = function() {
+            console.log('Connected');
+            self.ws.send(
+                JSON.stringify({action: 'NEW_PLAYER', 
+                    name: name,
+                    arg: name
+                }));
+            self.my_name = name;
+            update_ui();
+        };
 
-game.is_my_turn = function() {
-    return this.current_player == this.my_name
-}
+        this.ws.onerror = function(e) {
+          alert('Failed to connect! Please retry.');
+        };
 
-var sort_function =  function(suite, val, l, r) {
-    l = normalize_card_val(l.value[0], l.value[1], suite, val);
-    r = normalize_card_val(r.value[0], r.value[1], suite, val);
+        this.ws.onmessage = function(e) {
+            console.log(e.data);
+            var data = JSON.parse(e.data);
+            if ('error' in data) {
+                alert(data.error);
+            } else if ('msg' in data) {
+                var t = $('#chat_text');
+                t.append($('<p>' + data.msg + '</p>'));
+            } else {
+                self.handle_message(data.name, data.action, data.arg);
+            }
+            update_ui();
+        };
+    },
+
+    start(num_decks) {
+        var t = { 
+            name: this.my_name,
+            action: 'START', 
+            arg: {
+                num_decks: num_decks, 
+            }
+        };
+        this.ws.send(JSON.stringify(t));
+    },
+
+    draw() {
+        var t = { action: 'DRAW', arg: {num_cards: 1 },
+            name: this.my_name};
+        this.ws.send(JSON.stringify(t));
+        if (this.auto_end_turn) {
+            this.ws.send( JSON.stringify({
+                name: this.my_name,
+                action: 'END_TURN',
+                arg: {}
+            }));
+        }
+        return false;
+    },
+
+    play(cards) {
+        if (cards.length == 0) {
+            return;
+        }
+        var card_set = new Set(cards);
+        game.hand = game.hand.filter((x) => { return !card_set.has(x); });
+
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'PLAY',
+            arg: { cards: cards}
+        }));
+
+        if (this.auto_end_turn) {
+            this.ws.send( JSON.stringify({
+                name: this.my_name,
+                action: 'END_TURN',
+                arg: {}
+            }));
+        }
+    },
+
+    take_back(cards) {
+        if (cards.length == 0) {
+            return;
+        }
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'TAKE_BACK',
+            arg: {
+                cards: cards
+            }
+        }));
+    },
+
+    clear_table() {
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'CLEAN_TABLE',
+            arg: ''
+        }));
+    },
+
+    end_turn() {
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'END_TURN',
+            arg: ''
+        }));
+    },
+
+    add_points(points) {
+        this.ws.send( JSON.stringify({
+            action: 'ADD_POINTS',
+            name: this.my_name,
+            arg: {
+                points: points 
+            }
+        }));
+    },
+
+    take_turn() {
+        this.ws.send( JSON.stringify({
+            action: 'TAKE_TURN',
+            name: this.my_name,
+            arg: {
+            }
+        }));
+    },
+
+    is_my_turn() {
+        return this.room.current_player.name == this.my_name;
+    },
+
+    return_to_deck(cards) {
+        if (cards.length == 0) {
+            return;
+        }
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'RETURN_TO_DECK',
+            arg: {cards: cards }
+        }));
+        var card_set = new Set(cards);
+        game.hand = game.hand.filter((x) => { return !card_set.has(x); });
+    },
+
+    clean_table() {
+        this.ws.send( JSON.stringify({
+            name: this.my_name,
+            action: 'CLEAN_TABLE',
+            arg: {}
+        }));
+    },
+
+    // handle messages (mostly because of actions of other ppl)
+    handle_message(name, action, arg) {
+        let game = this.room.game;
+        switch(action) {
+            case 'DRAW':
+                // some one draw a card
+                game.deck_count -= arg.num_cards;
+                break;
+            case 'CLEAN_TABLE':
+                game.table = [];
+                break;
+            case 'PLAY':
+                if (arg.cards.length > 0) { 
+                    game.table.push([name, arg.cards]);
+                }
+                break;
+            case 'RETURN_TO_DECK':
+                game.deck_count += arg.num_cards;
+                break;
+            case 'TAKE_TURN':
+                for (var p of this.room.players) {
+                    if (p.name == name) {
+                        this.room.current_player = p;
+                    }
+                }
+                break;
+            case 'SET_STATE':
+                console.log('set state', arg);
+                if ('room' in arg) {
+                    this.room = Object.assign(this.room, arg.room);
+                }
+                if ('hand' in arg) {
+                    this.hand = arg.hand;
+                }
+                break;
+            case 'SET_TEAM':
+                this.my_team = arg.team;
+                break;
+            case 'DRAWED':
+                for (var x of arg) {
+                    this.hand.push(x);
+                }
+                break;
+            case 'ADD_POINTS':
+                for (let p of this.room.players) {
+                    if (p.name == name) {
+                        p.score += arg.points;
+                    }
+                }
+                break;
+        }
+    }
+
+}; 
+
+function default_sort_func(suite, val, l, r) {
+    l = normalize_card_val(l, suite, val);
+    r = normalize_card_val(r, suite, val);
     var result;
     result = l[1] - r[1];
     if (l[0] != r[0]) {
-        result = l[0].charCodeAt(0) - r[0].charCodeAt(0);
-    }
-    if (result == 0) {
-        // tie breaker
-        result = l.id - r.id;
+        result = l[0] - r[0];
     }
     return result;
-}.bind(null, 'S', 2);
+}
 
-function normalize_card_val(current_suite, current_val, tsuite, tval) {
-    if (current_suite == 'JOKER') {
-        current_suite = 'Z';  
+var sort_function = default_sort_func.bind(null, 'S', 2);
+
+const CLUBBER = 0;
+const DIAMOND = 1;
+const HEART = 2;
+const SPADE = 3;
+const JOKER = 4;
+
+function normalize_card_val(id, tsuite, tval) {
+    let card = new Card(id);
+    tsuite = {
+        'C': 0,
+        'D': 1,
+        'H': 2,
+        'S': 3,
+        'NT': 3,
+    }[tsuite];
+    let suite = card.suite;
+    let value = card.value;
+
+    if (value == tval) {
+        var bonus = suite == tsuite ? 2 : 1;
+        suite = JOKER;
+        value = 14 + bonus;
     }
-    if (current_val == tval) {
-        var bonus = current_suite == tsuite ? 2 : 1;
-        current_suite = 'Z';
-        current_val = 14 + bonus;
+    if (suite == tsuite) {
+        suite = JOKER;
     }
-    if (tsuite != 'NT' && current_suite == tsuite) {
-        current_suite = 'Z';
-    }
-    return [current_suite, current_val];
+    return [suite, value];
 }
 
 function update_ui() {
     $('#players').empty();
     $('#starting_players').empty();
-    var current_player = game.current_player;
-    var players =  game.status == 'NEW' ? $('#starting_players') : $('#players');
-    if (conn != null) {
+    var current_player = game.room.current_player;
+    if (game.ws != null) {
       $('#show_player').show();
     }
 
-    if (game.status != 'NEW' && conn != null) {
+    if (game.room.game != null && game.ws != null) {
       $('#start_area').hide();
       $('#play_area').show();
     } else {
@@ -214,40 +463,48 @@ function update_ui() {
       $('#play_area').hide();
     }
 
-    for (var i in game.players) {
+    for (var p of game.room.players) {
         var c = $('<div class="col-sm">') ;
-        var p;
-        if (game.players[i] == current_player) {
-            p = '<b>' + current_player + '</b>';
+        var text;
+        if (p.name == current_player) {
+           text = `<b> ${p.name} (${p.score}) </b>`;
         } else {
-            p = game.players[i];
+            text = `${p.name} (${p.score})`;
         }
-        c.html(p);
-        players.append(c);
+        c.html(text);
+        $('#players').append(c);
     }
 
-    for (var i in game.waiting_players) {
+    for (var p of game.room.observers) {
         var c = $('<div class="col-sm">') ;
-        var p = game.waiting_players[i] + '(waiting)';
-        c.html(p);
-        players.append(c);
+        c.html(`${p.name} (waiting)`);
+        if (game.room.game == null) {
+            $('#starting_players').append(c);
+        } else {
+            $('#players').append(c);
+        }
     }
-    if (game.status == 'NEW') {
-      if (game.player_id == 0) {
-        $('#start_button_area').show();
-      } else {
-        $('#start_button_area').hide();
-      }
-    }
-    if (game.player_id == 0) {
+
+
+    if (game.my_name == 'han') {
         $('.master').show();
     } else {
         $('.master').hide();
     }
+
+    if (game.room.game == null) {
+      if (game.my_name == 'han') {
+        $('#start_button_area').show();
+      } else {
+        $('#start_button_area').hide();
+      }
+      return;
+    }
+
     $('#table').empty();
-    for (var i in game.table) {
-        var player_name = game.table[i][0];
-        var cards = game.table[i][1];
+    for (var i in game.room.game.table) {
+        var player_name = game.room.game.table[i][0];
+        var cards = game.room.game.table[i][1];
         var col = $('<div class="player_table">');
         var slot = $('<div class="mygrid">');
         for (var j in cards) {
@@ -272,217 +529,72 @@ function update_ui() {
         $('#hand').append(c);
     }
 
-    $('#deck_cards').text(game.deck_cards);
+    $('#deck_cards').text(game.room.game.deck_count);
 
     if (game.is_my_turn()) {
         $('#turn').text('YOUR TURN');
     } else {
-        $('#turn').text(game.current_player + '\'s turn');
+        $('#turn').text(game.room.current_player.name + '\'s turn');
     } 
     $('.turn_control').prop('disabled', !game.is_my_turn());
-    if (Object.keys(game.selected).length == 0) {
-        $('#send').prop('disabled', true);
-        $('#return_to_deck').prop('disabled', true);
-    }
-    if (Object.keys(game.table_selected).length == 0) {
-        $('#takeback').prop('disabled', true);
-    }
-    if (game.status == 'PLAYING') {
-        $('#draw').prop('disabled', true);
-        $('#return_to_deck').prop('disabled', true);
-        $('#draw_continuesly').prop('disabled', true);
-    }
-    
-    $('#points').empty();
-    for (var p in game.points) {
-        $('#points').append($('<p>' + p + ': ' + game.points[p] + '</p>'));
-    }
 }
 
 
-var conn = null;
-var should_continuesly_draw = false;
-var last_draw_turn = -1;
-function continuesly_draw() {
-    if (!should_continuesly_draw) {
-        return;
-    }
-    if (game.deck_cards <= game.draw_until) {
-        return;
-    }
-    if (game.status != 'STARTED') {
-        return;
-    }
-    if (game.is_my_turn() && last_draw_turn < game.turn_number) {
-        last_draw_turn = game.turn_number;
-        conn.send( JSON.stringify( {
-          action: 'DRAW',
-          arg: 1
-        }));
-    } else if (game.is_my_turn()) {
-        conn.send( JSON.stringify( {
-          action: 'END_TURN',
-          arg: ''
-        }));
-    }
-
-
-    setTimeout(continuesly_draw, 300);
-}
-
-
-function connect() {
-    var wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host;
-    conn = new WebSocket(wsUri);
-    var name = $('#name').val()
-    console.log('Connecting...');
-    conn.onopen = function() {
-        console.log('Connected');
-        conn.send(
-            JSON.stringify({action: 'NEW_PLAYER', 
-                arg: name}));
-    };
-    game.my_name = name;
-    conn.onerror = function(e) {
-      alert('Failed to connect! Please retry.');
-    };
-    conn.onmessage = function(e) {
-        var data = JSON.parse(e.data);
-        if ('error' in data) {
-            alert(data.error);
-        } else if ('msg' in data) {
-            var t = $('#chat_text');
-            t.append($('<p>' + data.msg + '</p>'));
-        } else {
-            Object.assign(game, data);
-        }
-        update_ui();
-
-    };
-    conn.onclose = function() {
-        conn = null;
-        update_ui();
-    };
-}
 
 $(function() {
 
     $('#connect').on('click', function() {
-        if (conn == null) {
-            connect();
-        } else {
-           console.log('already connected.');
-        }
-
-        return false;
+        let name = $('#name').val();
+        game.join(name);
     });
     $('#send').on('click', function() {
         var to_play = [];
-        for (var k in game.selected) {
-            if (game.selected[k]) {
-                to_play.push(k);
-                delete game.selected[k];
+        $('input.hand_card').each( (i, e) => {
+            let elem = $(e);
+            if (e.checked) { 
+                to_play.push(parseInt(elem.attr('card_id')));
             }
-        }
+        });
         console.log(to_play);
-        conn.send( JSON.stringify({
-            action: 'PLAY',
-            arg: to_play
-        }));
-
-        if (auto_end_turn) {
-            conn.send( JSON.stringify({
-                action: 'END_TURN',
-                arg: '' 
-            }));
-        }
-
+        game.play(to_play);
         return false;
-    });
-    $('#text').on('keyup', function(e) {
-        if (e.keyCode === 13) {
-            $('#send').click();
-            return false;
-        }
     });
     $('button.start').on('click', function() {
         var num_decks = parseInt($('#num_decks').val());
-        var t = { 
-            action: 'START', 
-            arg: {
-                num_decks: num_decks, 
-                draw_until: 0,
-            }
-         };
-        conn.send(JSON.stringify(t));
+        game.start(num_decks);
         return false;
     });
     $('#new_game').on('click', function() {
         var num_decks = parseInt($('#spread_count').val()) || parseInt($('#num_decks').val());
-        var t = { 
-            action: 'START', 
-            arg: {
-                num_decks: num_decks, 
-                draw_until: 0,
-            }
-         };
-        conn.send(JSON.stringify(t));
+        game.start(num_decks);
         $('#pread_count').val('');
         return false;
     });
     $('#draw').on('click', function() {
-        var t = { action: 'DRAW', arg: 1 };
-        conn.send(JSON.stringify(t));
-        if (auto_end_turn) {
-            conn.send( JSON.stringify({
-                action: 'END_TURN',
-                arg: '' 
-            }));
-        }
-
+        game.draw();
         return false;
     });
     $('#takeback').on('click', function() {
         var to_play = [];
-        for (var k in game.table_selected) {
-            if (game.table_selected[k]) {
-                to_play.push(k);
-                delete game.table_selected[k];
+        $('input.table_card').each( (i, e) => {
+            let elem = $(e);
+            if (elem.is(':checked')) { 
+                to_play.push(parseInt(elem.attr('card_id')));
             }
-        }
+        });
         console.log(to_play);
-        conn.send( JSON.stringify({
-            action: 'TAKE_BACK',
-            arg: to_play
-        }));
-
+        game.take_back(to_play);
         return false;
     });
 
     $('#clear_table').on('click', function() {
-        conn.send( JSON.stringify({
-            action: 'CLEAN_TABLE',
-            arg: ''
-        }));
+        game.clean_table();
         return false;
     });
 
     $('#end_turn').on('click', function() {
-        conn.send( JSON.stringify({
-            action: 'END_TURN',
-            arg: ''
-        }));
+        game.end_turn();
         return false;
-    });
-
-    $('#draw_continuesly').on('click', function() {
-        should_continuesly_draw = !should_continuesly_draw;
-        if (should_continuesly_draw) {
-           $(this).text('停止摸牌');
-           continuesly_draw();
-        } else {
-           $(this).text('持续摸牌');
-        }
     });
 
     $('#sort_form').on('submit', function(event) {
@@ -491,97 +603,68 @@ $(function() {
         var suite = $('.suite_radio:checked').val();
         var val =  $('#number_input').val();
         console.log(suite, val);
-        sort_function = function(suite, val, l, r) {
-            var lid = l.id;
-            var rid = r.id;
-            l = normalize_card_val(l.value[0], l.value[1], suite, val);
-            r = normalize_card_val(r.value[0], r.value[1], suite, val);
-            var result;
-            result = l[1] - r[1];
-            if (l[0] != r[0]) {
-                result = l[0].charCodeAt(0) - r[0].charCodeAt(0);
-            }
-            if (result == 0) {
-                // tie breaker
-                result = lid - rid;
-            }
-            return result;
-        }.bind(null, suite, val);
-
+        sort_function = default_sort_func.bind(null, suite, val);
         update_ui();
         event.preventDefault();
     });
     $('#return_to_deck').on('click', function() {
         var to_play = [];
-        for (var k in game.selected) {
-            if (game.selected[k]) {
-                to_play.push(k);
-                delete game.selected[k];
+        $('input.hand_card').each( (i, e) => {
+            let elem = $(e);
+            if (e.checked) { 
+                to_play.push(parseInt(elem.attr('card_id')));
             }
-        }
+        });
         console.log(to_play);
-        conn.send( JSON.stringify({
-            action: 'RETURN_TO_DECK',
-            arg: to_play
-        }));
-
+        game.return_to_deck(to_play);
         return false;
     });
     $('#end_draw').on('click', function() {
-        conn.send(JSON.stringify({
+        game.ws.send(JSON.stringify({
+            name: game.my_name,
             action: 'END_DRAW',
             arg: ''
         }));
     });
 
     $('#auto_end_turn').change(function() {
-        auto_end_turn = $(this).is(':checked');
+        game.auto_end_turn = $(this).is(':checked');
     });
 
     $('#take_turn').click(function() {
-        conn.send(JSON.stringify({
-            action: 'TAKE_TURN',
-            arg: ''
-        }));
+        game.take_turn();
+    });
+
+    $('#refresh').click(function() {
+            game.ws.send(JSON.stringify( {
+                name: game.my_name,
+                action: 'GET_STATE',
+                arg: {},
+            }));
     });
 
     $('#chat_window').keyup(function(event) {
         if (event.keyCode == 13 ) {
             var name = $('#name').val();
             var message = $('#chat_window').val();
-            conn.send(JSON.stringify( {
+            game.ws.send(JSON.stringify( {
+                name: game.my_name,
                 action: 'MESSAGE',
                 arg: name + ': ' + message,
             }));
             $('#chat_window').val('');
             if (message.startsWith('!')) {
                 message = message.substr(1);
-                var tokens = message.split(' ');
-                var objs = [' function test() {'];
-                for (var t of tokens) {
-                    if (t.charAt(0).match(/[a-z]/i)) {
-                        objs.push(' game.points.' + t + ' ');
-                    } else {
-                        objs.push(t);
-                    }
-                }
-                objs.push('} \n');
-                objs.push('test');
+                let points = parseInt(message);
+                game.add_points(points);
             }
-            var source = objs.join(' ');
-            console.log(source);
-            var func = eval(source);
-            func();
-            conn.send(JSON.stringify( {
-                action: 'SET_POINTS',
-                arg: game.points
-            }));
         }
     });
 
     $('#spread_cards').on('click', function() {
         var count = $('#spread_count').val();
-        conn.send( JSON.stringify( {
+        game.ws.send( JSON.stringify( {
+            name: game.my_name,
             action: 'SPREAD_CARDS',
             arg: count
         }));
@@ -590,10 +673,11 @@ $(function() {
     });
 
     $('#deal_from_deck').on('click', function() {
-        var count = $('#spread_count').val();
-        conn.send( JSON.stringify ({
+        var count = parseInt($('#spread_count').val());
+        game.ws.send( JSON.stringify ({
+            name: game.my_name,
             action: 'DEAL',
-            arg: count,
+            arg: { num_cards: count }
         }));
         $('#spread_count').val('');
         return false;
@@ -601,15 +685,17 @@ $(function() {
 
     $('#sort_by_number').on('click', function() {
         sort_function = function(l, r) {
+            l = l % 54;
+            r = r % 54;
+            let lvalue = l % 13;
+            let lsuite = l / 13;
+            let rvalue = r % 13;
+            let rsuite = r / 13;
             var result;
             console.log('here');
-            result = l.value[0].charCodeAt(0) - r.value[0].charCodeAt(0);
-            if (l.value[1] != r.value[1]) {
-                result = l.value[1] - r.value[1];
-            }
-            if (result == 0) {
-                // tie breaker
-                result = l.id - r.id;
+            result = lsuite - rsuite;
+            if (lvalue != rvalue) {
+                result = lvalue - rvalue;
             }
             return result;
         };

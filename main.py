@@ -6,7 +6,7 @@ from aiohttp import web
 import jinja2
 
 from typing import Dict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pycards import game
 
@@ -16,13 +16,15 @@ def json_dumps(content):
 
 async def spread_cards(game, sockets, cards):
     for i in range(cards):
-        if not game.deck:
+        if not game.deck_count:
             break
         waitables = []
         for name, ws in sockets.items():
-            game.draw(name, 1)
-            waitables.append(ws.send_json( {
-                'hand': game.get_hand(name) 
+            cards = game.draw(name, 1)
+            waitables.append(ws.send_json({
+                'action': 'DRAWED',
+                'arg': cards,
+                'name': name,
             }))
         await asyncio.gather(*waitables)
         await asyncio.sleep(1)
@@ -31,8 +33,8 @@ async def spread_cards(game, sockets, cards):
 # things I need to in app context
 @dataclass
 class State(object):
-    players: Dict[str, game.Player] = {}
-    ws_by_name: Dict[str, object] = {}
+    players: Dict[str, game.Player] = field(default_factory=dict)
+    ws_by_name: Dict[str, object] = field(default_factory=dict)
     room: game.GameRoom = game.GameRoom()
 
 
@@ -48,26 +50,50 @@ async def index(request):
     state = request.app['state']
     current_player = None
 
-
     while True:
         msg = await ws_current.receive()
-        cur_result = {}
+        broadcast = {}
+        reply_result = {}
         if msg.type == aiohttp.WSMsgType.text:
             try:
                 parsed = json.loads(msg.data)
-                new_name, action, arg = parsed['name'], parsed['action'], parsed['arg']
-                print(name, action, arg)
+                new_name, action, arg = parsed.get('name'), parsed['action'], parsed['arg']
+                print(new_name, action, arg)
                 if action == 'NEW_PLAYER':
                     name = new_name
-                    state.ws_by_name[name] = ws
-                    current_player = game.Player(name, 0)
-                    state.players[name] = current_player
+                    state.ws_by_name[name] = ws_current
+                    if name in state.players:
+                        current_player = state.players[name]
+                    else:
+                        current_player = game.Player(name, 0)
+                        state.players[name] = current_player
+                    if current_player in state.room.players:
+                        if state.room.game:
+                            reply_result = {
+                                'name': '',
+                                'action': 'SET_STATE',
+                                'arg': {
+                                    'hand': state.room.game.hand(name)
+                                }
+                            }
+                    else:
+                        if current_player not in state.room.observers:
+                            state.room.observers.append(current_player)
+                    broadcast = {
+                        'name': '',
+                        'action': 'SET_STATE',
+                        'arg': {
+                            'room': state.room,
+                        }
+                    }
                 elif action == 'SPREAD_CARDS':
                     count = int(arg)
                     await spread_cards(state.room.game, state.ws_by_name, count)
+                elif action == 'MESSAGE':
+                    broadcast['msg'] = arg
                 else:
-                    assert current_player.name == new_name
-                    cur_result = state.room.handle_command(current_player, action, arg)
+                    assert new_name is None or current_player.name == new_name
+                    reply_result, broadcast = state.room.handle_command(current_player, action, arg)
             except ValueError as e:
                 print(e)
                 import traceback
@@ -75,21 +101,20 @@ async def index(request):
                 await ws_current.send_json({'error': str(e)})
             else:
                 to_send = []
-                for ws in state.ws_by_name.values():
-                    to_send.append(ws.send_str(msg.data))
-                if cur_result:
-                    to_send.append(ws_current.send_json(cur_result, dumps=json_dumps))
-                print('result:', cur_result)
-                await asyncio.gather(to_send)
+                if broadcast:
+                    for ws in state.ws_by_name.values():
+                        to_send.append(ws.send_json(broadcast, dumps=json_dumps))
+                if reply_result:
+                    to_send.append(ws_current.send_json(reply_result, dumps=json_dumps))
+                await asyncio.gather(*to_send)
         else:
             break
 
     del state.ws_by_name[current_player.name]
-    state.room.players.remove(current_player)
     to_send = []
-    for ws in request.app['websockets'].values():
+    for ws in state.ws_by_name.values():
         to_send.append(ws.send_json({'player_left': current_player.name}))
-    await asyncio.gather(to_send)
+    await asyncio.gather(*to_send)
 
     return ws_current
 
@@ -106,7 +131,7 @@ async def init_app():
 
 
 async def shutdown(app):
-    for ws in app['state'].ws_by_name.items():
+    for ws in app['state'].ws_by_name.values():
         await ws.close()
     app['state'].ws_by_name.clear()
 
