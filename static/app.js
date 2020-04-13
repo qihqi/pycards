@@ -156,7 +156,7 @@ function card_text(card) {
     }
 }
 
-function make_card(card, is_hand) {
+function make_card(card, is_hand, hand_pos) {
     var x = $('<div class="one_card">');
     var label = $('<label>');
     label.text(card_text(card));
@@ -175,6 +175,12 @@ function make_card(card, is_hand) {
     x.append(input);
     x.append(label);
     x.append(card_img);
+    if (is_hand) {
+        let label2 = $('<label>');
+        label2.text(`( ${card_select_keys[hand_pos]} )`);
+        x.append(label2);
+    }
+
     return x;
 }
 
@@ -523,7 +529,7 @@ function update_ui() {
     }
     $('#hand_size').text(game.hand.length);
     for (var i in game.hand) {
-        var c = make_card(game.hand[i], true);
+        var c = make_card(game.hand[i], true, i);
         $('#hand').append(c);
     }
 
@@ -537,6 +543,24 @@ function update_ui() {
     $('.turn_control').prop('disabled', !game.is_my_turn());
 }
 
+
+
+var card_select_keys = [
+    '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '0',  '-',  '=',
+    'q',  'w',  'e',  'r',  't',  'y',  'u',  'i',  'o',  'p',  '[',  ']',
+    'a',  's',  'd',  'f',  'g',  'h',  'j',  'k',  ';',  '\''];
+
+var card_select_keys_map = {};
+for (var i in card_select_keys) {
+    card_select_keys_map[card_select_keys[i]] = i;
+}
+
+var control_keys = {
+    'v': $('#draw'),
+    'b': $('#send'),
+    'n': $('#clear_table'),
+    'm': $('#take_turn')
+};
 
 
 $(function() {
@@ -692,5 +716,26 @@ $(function() {
         };
         update_ui();
         return false;
+    });
+
+    $(window).keyup(function (e) {
+        if (game.ws == null || game.room.game == null) {
+            return;
+        }
+        if (e.target.tagName == 'INPUT') {
+            return;
+        }
+
+        if (e.key in control_keys) {
+            control_keys[e.key].trigger('click');
+        } else if (e.key in card_select_keys_map) {
+            let card_pos = card_select_keys_map[e.key];
+            let input = $($('.hand_card')[card_pos]);
+            if (e.ctrlKey) {
+                game.play([parseInt(input.attr('card_id'))]);
+            } else {
+                input.prop('checked', !input.is(':checked'));
+            }
+        }
     });
 });
