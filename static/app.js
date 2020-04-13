@@ -731,7 +731,7 @@ $(function() {
         } else if (e.key in card_select_keys_map) {
             let card_pos = card_select_keys_map[e.key];
             let input = $($('.hand_card')[card_pos]);
-            if (e.ctrlKey) {
+            if (e.altKey) {
                 game.play([parseInt(input.attr('card_id'))]);
             } else {
                 input.prop('checked', !input.is(':checked'));
