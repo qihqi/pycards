@@ -203,7 +203,8 @@ var game = {
             console.log('already connected.');
             return;
         }
-        let wsUri = (window.location.protocol=='https:'&&'wss://'||'ws://')+window.location.host;
+        let location = window.location;
+        let wsUri = (location.protocol=='https:'&&'wss://'||'ws://') + location.host + location.pathname + 'ws';
         this.ws = new WebSocket(wsUri);
         var self = this;
         this.ws.onopen = function() {
@@ -332,6 +333,7 @@ var game = {
     },
 
     is_my_turn() {
+        if (this.room.current_player == null) return false;
         return this.room.current_player.name == this.my_name;
     },
 
@@ -405,6 +407,15 @@ var game = {
                         p.score += arg.points;
                     }
                 }
+                break;
+            case 'PLAYER_LEFT':
+                console.log('here');
+                this.room.players = this.room.players.filter( (x) => {
+                    return x.name != name;
+                });
+                this.room.observers = this.room.observers.filter( (x) => {
+                    return x.name != name;
+                });
                 break;
         }
     }

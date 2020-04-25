@@ -129,6 +129,18 @@ class GameRoom(GameObj):
             self._current_turn += 1
             self._current_turn %= len(self.players)
 
+    def leave_room(self, player):
+        if player == self.current_player:
+            self.end_turn(player)
+        try:
+            self.players.remove(player)
+        except ValueError:
+            pass
+        try:
+            self.observers.remove(player)
+        except ValueError:
+            pass
+
     @property
     def current_player(self):
         if self.players:

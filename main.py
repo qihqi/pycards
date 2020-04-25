@@ -39,11 +39,15 @@ class State(object):
 
 
 async def index(request):
+    return web.FileResponse('static/index.html')
+
+
+async def ws_handler(request):
     ws_current = web.WebSocketResponse()
     ws_ready = ws_current.can_prepare(request)
 
     if not ws_ready.ok:
-        return aiohttp_jinja2.render_template('index.html', request, {})
+        return web.Response(status=400)
 
     # Does this means I have connected in js?
     await ws_current.prepare(request)
@@ -110,10 +114,17 @@ async def index(request):
         else:
             break
 
+    if current_player is not None:
+        state.room.leave_room(current_player)
     del state.ws_by_name[current_player.name]
     to_send = []
+    print('PLAYER_LEFT', current_player.name)
     for ws in state.ws_by_name.values():
-        to_send.append(ws.send_json({'player_left': current_player.name}))
+        to_send.append(ws.send_json({
+            'name': current_player.name,
+            'action': 'PLAYER_LEFT',
+            'arg': ''
+        }))
     await asyncio.gather(*to_send)
 
     return ws_current
@@ -126,6 +137,7 @@ async def init_app():
     aiohttp_jinja2.setup(
             app, loader=jinja2.FileSystemLoader('templates'))  # directories relative
     app.router.add_get('/', index)
+    app.router.add_get('/ws', ws_handler)
     app.router.add_routes([web.static('/static', 'static')])
     return app
 
