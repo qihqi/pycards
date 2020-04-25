@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import aiohttp
@@ -9,6 +10,10 @@ from typing import Dict
 from dataclasses import dataclass, field
 
 from pycards import game
+
+parser = argparse.ArgumentParser(description='dapai')
+parser.add_argument('--port')
+
 
 def json_dumps(content):
     return json.dumps(content, cls=game.ModelEncoder)
@@ -150,7 +155,8 @@ async def shutdown(app):
 
 def main():
     app = init_app()
-    web.run_app(app)
+    args = parser.parse_args()
+    web.run_app(app, port=args.port)
 
 
 if __name__ == '__main__':
