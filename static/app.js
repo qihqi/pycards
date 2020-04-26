@@ -199,7 +199,9 @@ var game = {
     auto_end_turn: true,
 
     join(name) {
-        if (this.ws != null) {
+        if (this.ws != null && 
+                (this.ws.readyStatus == WebSocket.OPEN 
+                 || this.ws.readyStatus == WebSocket.CONNECTING)) {
             console.log('already connected.');
             return;
         }
@@ -235,6 +237,11 @@ var game = {
             }
             update_ui();
         };
+
+        this.ws.onclose = function(e) {
+            console.log('connection closed..., retry');
+            self.join(name);
+        }
     },
 
     start(num_decks) {
