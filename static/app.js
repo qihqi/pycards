@@ -469,7 +469,7 @@ function update_ui() {
     if (game.ws != null) {
       $('#show_player').show();
     }
-
+    var am_i_observer = false;
     if (game.room.game != null && game.ws != null) {
       $('#start_area').hide();
       $('#play_area').show();
@@ -484,7 +484,7 @@ function update_ui() {
         if (p.name == current_player) {
            text = `<b> ${p.name} (${p.score}) </b>`;
         } else {
-            text = `${p.name} (${p.score})`;
+           text = `${p.name} (${p.score})`;
         }
         c.html(text);
         $('#players').append(c);
@@ -498,6 +498,15 @@ function update_ui() {
         } else {
             $('#players').append(c);
         }
+        if (game.my_name == p.name) {
+            am_i_observer = true;
+        }
+    }
+
+    if (am_i_observer) {
+        $('#join').show();
+    } else {
+        $('#join').hide();
     }
 
 
@@ -727,6 +736,14 @@ $(function() {
         };
         update_ui();
         return false;
+    });
+
+    $('#join').click(function () {
+        game.ws.send( JSON.stringify ({
+            name: game.my_name,
+            action: 'JOIN_GAME',
+            arg: {}
+        }));
     });
 
     $(window).keyup(function (e) {

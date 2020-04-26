@@ -37,7 +37,7 @@ class GameState(GameObj):
         return list(zip(self._table_players, self._table))
 
     def hand(self, name) -> Set[int]:
-        return self._hands[name]
+        return self._hands.get(name, set())
 
     def draw(self, name: str, count: int) -> List[int]:
         if count > len(self._deck):
@@ -202,6 +202,21 @@ class GameRoom(GameObj):
         elif command == 'ADD_POINTS':
             player.score += arg_dict['points']
         elif command == 'GET_STATE':
+            reply_result = {
+                'name': player.name,
+                'action': 'SET_STATE',
+                'arg': {
+                    'room': self,
+                    'hand': self.game.hand(player.name)
+                }
+            }
+        elif command == 'JOIN_GAME':
+            if player not in self.players:
+                self.players.append(player)
+            try:
+                self.observers.remove(player)
+            except ValueError:
+                pass
             reply_result = {
                 'name': player.name,
                 'action': 'SET_STATE',

@@ -10,3 +10,4 @@
 * many games at same time
 * better score keeping ( have teams?)
 * have new game clear scores
+* persistence
