@@ -114,6 +114,8 @@ class GameRoom(GameObj):
 
     def new_game(self, num_decks):
         self.players += self.observers
+        if not self.players:
+            return
         for p in self.players:
             p.score = 0
         self.observers = []
@@ -140,6 +142,8 @@ class GameRoom(GameObj):
             self.observers.remove(player)
         except ValueError:
             pass
+        if not self.players:
+            self.game = None
 
     @property
     def current_player(self):
