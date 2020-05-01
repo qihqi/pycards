@@ -229,9 +229,9 @@ var game = {
             var data = JSON.parse(e.data);
             if ('error' in data) {
                 alert(data.error);
-            } else if ('msg' in data) {
+            } else if (data.action == 'MESSAGE') {
                 var t = $('#chat_text');
-                t.append($('<p>' + data.msg + '</p>'));
+                t.append($('<p>' + data.arg + '</p>'));
             } else {
                 self.handle_message(data.name, data.action, data.arg);
             }

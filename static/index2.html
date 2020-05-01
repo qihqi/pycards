@@ -72,6 +72,7 @@
     .center {
       margin: auto;
     }
+
 </style>
 	</head>
 	<body>
@@ -86,6 +87,32 @@
             var app = Elm.Main.init( {
                  node: document.getElementById("play_area")
             });
+
+        var socket = new WebSocket('ws://localhost:8080/ws');
+        socket.onopen = function() {
+            console.log('Connected');
+            var name = 'han';
+            socket.send(
+                JSON.stringify({action: 'NEW_PLAYER', 
+                    name: name,
+                    arg: name
+                }));
+            socket.send(
+                JSON.stringify({action: 'START', 
+                    name: name,
+                    arg:  {'num_decks': 2}
+                }));
+        };
+        app.ports.sendMessage.subscribe(function(message) {
+            socket.send(message);
+        });
+
+        // When a message comes into our WebSocket, we pass the message along
+        // to the `messageReceiver` port.
+        socket.addEventListener("message", function(event) {
+            console.log(event.data);
+            app.ports.messageReceiver.send(event.data);
+        });
         </script>
 	</body>
 </html>

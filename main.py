@@ -99,7 +99,11 @@ async def ws_handler(request):
                     count = int(arg)
                     await spread_cards(state.room.game, state.ws_by_name, count)
                 elif action == 'MESSAGE':
-                    broadcast['msg'] = arg
+                    broadcast = {
+                        'name': current_player.name,
+                        'action': 'MESSAGE',
+                        'arg': arg
+                    }
                 else:
                     assert new_name is None or current_player.name == new_name
                     reply_result, broadcast = state.room.handle_command(current_player, action, arg)
