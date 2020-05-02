@@ -80,7 +80,7 @@ class Card {
     get card_text() {
         var suite = [
             '\u2663',
-            '\u2666', 
+            '\u2666',
             '\u2665',
             '\u2660',
             ];
@@ -122,7 +122,7 @@ function card_text(card) {
     }
     var suite = [
         '\u2663',
-        '\u2666', 
+        '\u2666',
         '\u2665',
         '\u2660',
         ];
@@ -169,7 +169,7 @@ function make_card(card, is_hand, hand_pos) {
     input.attr('card_id', card);
     var card_img = $('<img height="120" >');
     card_img.attr('src', card_img_urls[card % 54]);
-    card_img.click(function(input) { 
+    card_img.click(function(input) {
         input.prop('checked', !input.is(':checked'));
     }.bind(null, input));
     x.append(input);
@@ -199,8 +199,8 @@ var game = {
     auto_end_turn: true,
 
     join(name) {
-        if (this.ws != null && 
-                (this.ws.readyStatus == WebSocket.OPEN 
+        if (this.ws != null &&
+                (this.ws.readyStatus == WebSocket.OPEN
                  || this.ws.readyStatus == WebSocket.CONNECTING)) {
             console.log('already connected.');
             return;
@@ -212,7 +212,7 @@ var game = {
         this.ws.onopen = function() {
             console.log('Connected');
             self.ws.send(
-                JSON.stringify({action: 'NEW_PLAYER', 
+                JSON.stringify({action: 'NEW_PLAYER',
                     name: name,
                     arg: name
                 }));
@@ -245,11 +245,11 @@ var game = {
     },
 
     start(num_decks) {
-        var t = { 
+        var t = {
             name: this.my_name,
-            action: 'START', 
+            action: 'START',
             arg: {
-                num_decks: num_decks, 
+                num_decks: num_decks,
             }
         };
         this.ws.send(JSON.stringify(t));
@@ -325,7 +325,7 @@ var game = {
             action: 'ADD_POINTS',
             name: this.my_name,
             arg: {
-                points: points 
+                points: points
             }
         }));
     },
@@ -377,7 +377,7 @@ var game = {
                 game.table = [];
                 break;
             case 'PLAY':
-                if (arg.cards.length > 0) { 
+                if (arg.cards.length > 0) {
                     game.table.push([name, arg.cards]);
                 }
                 break;
@@ -427,7 +427,7 @@ var game = {
         }
     }
 
-}; 
+};
 
 function default_sort_func(suite, val, l, r) {
     l = normalize_card_val(l, suite, val);
@@ -566,7 +566,7 @@ function update_ui() {
         $('#turn').text('YOUR TURN');
     } else {
         $('#turn').text(game.room.current_player.name + '\'s turn');
-    } 
+    }
     $('.turn_control').prop('disabled', !game.is_my_turn());
 }
 
@@ -600,7 +600,7 @@ $(function() {
         var to_play = [];
         $('input.hand_card').each( (i, e) => {
             let elem = $(e);
-            if (e.checked) { 
+            if (e.checked) {
                 to_play.push(parseInt(elem.attr('card_id')));
             }
         });
@@ -627,7 +627,7 @@ $(function() {
         var to_play = [];
         $('input.table_card').each( (i, e) => {
             let elem = $(e);
-            if (elem.is(':checked')) { 
+            if (elem.is(':checked')) {
                 to_play.push(parseInt(elem.attr('card_id')));
             }
         });
@@ -647,7 +647,7 @@ $(function() {
     });
 
     $('#sort_form').on('submit', function(event) {
-        var data = new FormData(this); 
+        var data = new FormData(this);
         console.log(data);
         var suite = $('.suite_radio:checked').val();
         var val =  $('#number_input').val();
@@ -660,7 +660,7 @@ $(function() {
         var to_play = [];
         $('input.hand_card').each( (i, e) => {
             let elem = $(e);
-            if (e.checked) { 
+            if (e.checked) {
                 to_play.push(parseInt(elem.attr('card_id')));
             }
         });
@@ -733,14 +733,16 @@ $(function() {
     });
 
     $('#sort_by_number').on('click', function() {
-        sort_function = function(l, r) {
-            let c1 = new Card(l);
-            let c2 = new Card(r);
-            if (l.value != r.value) {
-                return l.value - r.value;
+        function sort_func_by_number(suite, val, l, r) {
+            l = normalize_card_val(l, suite, val);
+            r = normalize_card_val(r, suite, val);
+            if (l[1] != r[1]) {
+                return l[1] - r[1];
             }
-            return l.suite - r.suite;
-        };
+            return l[0] - r[0];
+        }
+
+        sort_function = sort_func_by_number.bind(null, 'S', 2);
         update_ui();
         return false;
     });
