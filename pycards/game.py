@@ -94,7 +94,7 @@ class Player(GameObj):
     score: int = 0
     total_score: int = 0
 
-    _exposed = ['name', 'team', 'score', 'total_score']
+    _exposed = ['name', 'score']
 
 
 class GameRoom(GameObj):

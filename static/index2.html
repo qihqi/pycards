@@ -97,11 +97,6 @@
                     name: name,
                     arg: name
                 }));
-            socket.send(
-                JSON.stringify({action: 'START', 
-                    name: name,
-                    arg:  {'num_decks': 2}
-                }));
         };
         app.ports.sendMessage.subscribe(function(message) {
             socket.send(message);

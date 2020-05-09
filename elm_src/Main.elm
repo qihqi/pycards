@@ -1,41 +1,53 @@
-port module Main exposing (main)
+port module Main exposing (..)
 
 import Set exposing (Set, insert, remove)
 import Array
 import Browser
+import Dict
 import Debug
-import Html exposing (Html, button, div, text, h4, h3, h4, hr, span, input, form, img, p)
+import Html exposing (Html, button, div, text, h2, h3, h4, hr, span, input, form, img, p)
 import Html.Events exposing (onClick, on, onInput, onCheck)
 import Html.Attributes exposing (class, id, style, attribute, name, value, type_, placeholder, checked)
 import String
 
 import Json.Encode as Encode
-import Json.Decode as Decode exposing (Decoder, int, string, list, maybe, field, andThen)
+import Json.Decode as Decode exposing (Decoder, int, string, list, maybe, field, andThen, at, nullable)
 import Json.Decode.Pipeline exposing (required, optional)
 
 
 port sendMessage : String -> Cmd msg
 port messageReceiver: (String -> msg) -> Sub msg
 
-type GameStatus = Start | PLAYING
+type GameStatus = IDLE | OBSERVING | PLAYING
 
-type alias Player = 
+type alias Player =
   { name : String
   , score: Int
   }
 
 decodePlayer : Decoder Player
 decodePlayer =
-  Decode.succeed Player 
+  Decode.succeed Player
     |> required "name" string
     |> required "score" int
 
-type alias Game = 
+type alias Game =
     { table :  List (String, List Int)
     , deck_count : Int
     }
 
-decodeTuple = 
+addToDeckCount : Int -> Game -> Game
+addToDeckCount deck game = {
+    game | deck_count = game.deck_count + deck }
+
+addToTable : (String, List Int) -> Game -> Game
+addToTable play game = {
+    game | table = List.append game.table [play]}
+
+cleanTable : Game -> Game
+cleanTable game = {game | table = []}
+
+decodeTuple =
   Decode.map2 Tuple.pair
     (Decode.index 0 string)
     (Decode.index 1 (list int))
@@ -44,7 +56,7 @@ decodeGame : Decoder Game
 decodeGame =
   Decode.succeed Game
     |> required "table" (list decodeTuple)
-    |> required "score" int
+    |> required "deck_count" int
 
 
 type alias Room =
@@ -52,7 +64,7 @@ type alias Room =
     , players : List Player
     , observers : List Player
     , current_player : Maybe Player
-    } 
+    }
 
 decodeRoom =
   Decode.succeed Room
@@ -62,9 +74,9 @@ decodeRoom =
    |> optional "current_player" (maybe decodePlayer) Nothing
 
 
-type alias Model = 
-    { room: Room 
-    , status: GameStatus 
+type alias Model =
+    { room: Maybe Room
+    , status: GameStatus
     , auto_end_turn: Bool
     , hand: List Int
     , my_name: String
@@ -75,21 +87,28 @@ type alias Model =
     , hand_selected: Set Int
     }
 
+modifyRoom : (Room -> Room) -> Model -> Model
+modifyRoom func model = { model | room = Maybe.map func model.room}
+
+modifyGame : (Game -> Game) -> Model -> Model
+modifyGame func = modifyRoom
+  (\r -> { r | game = Maybe.map func r.game })
+
+
 decodeHand = list int
 
 initialTable : (String, List Int)
 initialTable = ("hand", [2,3,4])
 
-
 init_state : () -> (Model, Cmd msg)
-init_state _ = 
+init_state _ =
     ( { room =
-            { game = Just { table=[initialTable], deck_count=54}
-            , players = [{name = "han", score=12}]
+            Just { game = Nothing
+            , players = []
             , observers = []
-            , current_player = (Just {name = "han", score=12})
+            , current_player = Nothing
             }
-        , status = Start
+        , status = IDLE
         , auto_end_turn = False
         , hand = [0]
         , my_name = "han"
@@ -103,39 +122,39 @@ init_state _ =
     )
 
 
-main = 
-    Browser.element 
+main =
+    Browser.element
       { init =init_state
       , update = update
       , view = view
-      , subscriptions = subscriptions 
+      , subscriptions = subscriptions
       }
 
 type Msg =
-    SetState String 
+    SetState String
     | UI UIAction
     | TableSelect Int Bool
     | HandSelect Int Bool
-    | Send 
-    | DraftChanged String 
+    | Send
+    | DraftChanged String
     | MessageReceived String
-    | Incoming String 
+    | Incoming String
     | None
 
 type UIAction =
     DRAW | PLAY | TAKE_BACK | RETURN_TO_DECK |
-    CLEAR_TABLE | END_TURN | TAKE_TURN | REFRESH
+    CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg model = 
+update msg model =
   case msg of
-    SetState x -> 
-      ({ model | 
-          room = 
-             case Decode.decodeString (field "room" decodeRoom) x of 
+    SetState x ->
+      ({ model |
+          room =
+             case Decode.decodeString (field "room" (maybe decodeRoom)) x of
                Ok r -> r
-               Err e -> model.room 
+               Err e -> model.room
        ,  hand = case Decode.decodeString (field "hand" decodeHand) x of
                Ok r -> r
                Err e -> model.hand
@@ -148,144 +167,176 @@ update msg model =
 
     DraftChanged m -> ({model | draft = m}, Cmd.none)
 
-    HandSelect cardId isAdd -> 
-      ( { model | hand_selected = 
-           if isAdd 
+    HandSelect cardId isAdd ->
+      ( { model | hand_selected =
+           if isAdd
               then (insert cardId model.hand_selected)
               else (remove cardId model.hand_selected)
         }
         , Cmd.none
       )
 
-    TableSelect cardId isAdd -> 
-      ( { model | table_selected = 
-           if isAdd 
+    TableSelect cardId isAdd ->
+      ( { model | table_selected =
+           if isAdd
               then (insert cardId model.table_selected)
               else (remove cardId model.table_selected)
         }
         , Cmd.none
       )
 
-    UI action -> (model, makeAction action model |> sendMessage)
-    Incoming message -> 
+    UI action -> (makeNewModel action model,
+                  makeAction action model |> sendMessage)
+    Incoming message ->
         ( case (Decode.decodeString (execAction model) message) of
             Ok m -> m
             Err e -> Debug.log (Decode.errorToString e) model
         , Cmd.none
         )
     _ -> (model, Cmd.none)
-      
+
+makeNewModel : UIAction -> Model -> Model
+makeNewModel action model =
+  case action of
+    PLAY ->
+      { model | hand = List.filter
+            (\x -> not <| Set.member x model.hand_selected)
+            model.hand
+      }
+    RETURN_TO_DECK ->
+      { model | hand = List.filter
+            (\x -> not <| Set.member x model.hand_selected)
+            model.hand
+      }
+    _ -> model
+
 
 makeAction : UIAction -> Model -> String
 makeAction action model =
-  let msg = case action of 
-        DRAW -> 
-          Encode.object 
+  let msg = case action of
+        DRAW ->
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "DRAW")
             , ("arg", Encode.object [("num_cards", Encode.int 1)])
             ]
-        PLAY -> 
-          Encode.object 
+        PLAY ->
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "PLAY")
-            , ("arg", Encode.object 
+            , ("arg", Encode.object
                 [ ("cards", Encode.list Encode.int (Set.toList model.hand_selected)) ])
-            ] 
-            
+            ]
+
         TAKE_BACK ->
-          Encode.object 
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "TAKE_BACK")
-            , ("arg", Encode.object 
+            , ("arg", Encode.object
                 [ ("cards", Encode.list Encode.int (Set.toList model.table_selected)) ])
-            ] 
+            ]
         RETURN_TO_DECK ->
-          Encode.object 
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "RETURN_TO_DECK")
-            , ("arg", Encode.object 
+            , ("arg", Encode.object
                 [ ("cards", Encode.list Encode.int (Set.toList model.hand_selected)) ])
-            ] 
-        CLEAR_TABLE ->
-          Encode.object 
+            ]
+        CLEAN_TABLE ->
+          Encode.object
             [ ("name", Encode.string model.my_name)
-            , ("action", Encode.string "CLEAR_TABLE")
+            , ("action", Encode.string "CLEAN_TABLE")
             , ("arg", Encode.string "")
-            ] 
+            ]
         END_TURN ->
-          Encode.object 
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "END_TURN")
             , ("arg", Encode.string "")
-            ] 
+            ]
         TAKE_TURN ->
-          Encode.object 
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "TAKE_TURN")
             , ("arg", Encode.string "")
-            ] 
+            ]
         REFRESH ->
-          Encode.object 
+          Encode.object
             [ ("name", Encode.string model.my_name)
             , ("action", Encode.string "GET_STATE")
             , ("arg", Encode.string "")
-            ] 
+            ]
   in Encode.encode 0 msg
 
 makeChatMessage my_name message =
-  Encode.encode 0 (Encode.object 
+  Encode.encode 0 (Encode.object
             [ ("name", Encode.string my_name)
             , ("action", Encode.string "MESSAGE")
             , ("arg", Encode.string message)
             ] )
 
-view model  = 
-  case model.room.game of
-    Nothing -> div [][]
-    Just game ->
-        let 
-          turnText = 
-              case model.room.current_player of
-                Nothing -> ""
-                Just p -> if p.name == model.my_name then 
-                      "YOUR TURN"
-                    else
-                      p.name ++ "'s turn" 
-        in 
-            div []
-            [ div [ id "chat_area"] 
-                  [  h3 [] [text "hello"]
-                  ,  div [id "chat_text"] 
-                         (List.map (\x -> p [] [text x]) model.messages)
-                  ,  input 
-                       [ id "chat_window"
-                       , attribute "placeholder" "请尬料"
-                       , onInput DraftChanged
-                       , on "keydown" (ifIsEnter Send)
-                       , value model.draft
-                       ]
-                      [] 
-                  ]
-            , div [ id "table_area" ]
-                  [ h4 [] [ text "Players:"]
-                  , div [class "row", id "players"]
-                      (List.map
-                        (\p ->  div [class "col-sm"]
-                           [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
-                        model.room.players)
-                  , h4 [] [text ("牌组还剩：" ++ (String.fromInt game.deck_count) ++"张")]
-                  , h4 [id "turn"] [text turnText]
-                  , h3 [] [ text "桌面:"]
-                  , div [class "row", id "table"] (List.map (makeTableCard model.table_selected) game.table)
-                  , hr [] []
-                  ]
-            , div [id "hand_area"]
-                  [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
-                  , div [class "mygrid", id "hand"] (List.map (makeCard True model.hand_selected) model.hand)
-                  ]
-            , controlArea True
+
+view model  =
+  (case model.room of
+    Nothing ->
+            div [id "start_area"]
+            [ h2 [class "center"] [ text "欢迎来打牌"]
+            , p [class "center"] 
+                [ input [ placeholder "NAME", id "name", type_ "text"] []
+                , button [id "connect"][text "加入游戏"]
+                ]
+            , p [id "start_button_area", class "center"]
+                [ input [id "num_decks", placeholder "几付牌"] []
+                , button [class "start", id "start"] [text "开始"]
+                ]
             ]
+              
+    Just room ->
+      case room.game of 
+        Nothing -> div [][]
+        Just game ->
+            let
+              turnText =
+                  case room.current_player of
+                    Nothing -> ""
+                    Just p -> if p.name == model.my_name then
+                          "YOUR TURN"
+                        else
+                          p.name ++ "'s turn"
+            in
+                div []
+                [ div [ id "chat_area"]
+                      [  h3 [] [text "hello"]
+                      ,  div [id "chat_text"]
+                             (List.map (\x -> p [] [text x]) model.messages)
+                      ,  input
+                           [ id "chat_window"
+                           , attribute "placeholder" "请尬料"
+                           , onInput DraftChanged
+                           , on "keydown" (ifIsEnter Send)
+                           , value model.draft
+                           ]
+                          []
+                      ]
+                , div [ id "table_area" ]
+                      [ h4 [] [ text "Players:"]
+                      , div [class "row", id "players"]
+                          (List.map
+                            (\p ->  div [class "col-sm"]
+                               [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
+                            room.players)
+                      , h4 [] [text ("牌组还剩：" ++ (String.fromInt game.deck_count) ++"张")]
+                      , h4 [id "turn"] [text turnText]
+                      , h3 [] [ text "桌面:"]
+                      , div [class "row", id "table"] (List.map (makeTableCard model.table_selected) game.table)
+                      , hr [] []
+                      ]
+                , div [id "hand_area"]
+                      [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
+                      , div [class "mygrid", id "hand"] (List.map (makeCard True model.hand_selected) model.hand)
+                      ]
+                , controlArea True
+                ])
 
 makeTableCard : Set Int -> (String, List Int) -> Html Msg
 makeTableCard selectedSet (player_name, cards) =
@@ -300,10 +351,9 @@ makeTableCard selectedSet (player_name, cards) =
     ]
 
 
-
 makeCard : Bool -> Set Int -> Int -> Html Msg
 makeCard isHand selectedSet cardValue =
-  let 
+  let
     isSelected = Set.member cardValue selectedSet
     selectEvent = (if isHand then HandSelect else TableSelect)
   in
@@ -336,7 +386,7 @@ controlArea enableMaster =
             [ text "拿回来" ]
       , button [ class "turn_control", id "return_to_deck", onClick (UI RETURN_TO_DECK) ]
             [ text "放回牌组" ]
-      , button [ class "turn_control", id "clear_table", onClick (UI CLEAR_TABLE) ]
+      , button [ class "turn_control", id "clear_table", onClick (UI CLEAN_TABLE) ]
             [ text "清空桌面(n)" ]
       , button [ class "turn_control", id "end_turn", onClick (UI END_TURN) ]
             [ text "结束回合" ]
@@ -402,17 +452,103 @@ controlArea enableMaster =
 
 execAction : Model -> Decode.Decoder Model
 execAction model =
-   (field "action" string) |>
-      andThen (\action -> case action of 
-          "DRAWED" -> 
-            (field "arg" decodeHand) |> 
-                andThen (\cards -> Decode.succeed {model | hand = model.hand ++ cards})
+   let
+     room = model.room
+     game = case model.room of 
+       Just r -> r.game
+       Nothing -> Nothing
+   in
+       (field "action" string) |>
+          andThen (\action ->
+            (field "name" string) |>
+              andThen( \name ->
+                  case action of
+                      "DRAWED" ->
+                        (field "arg" decodeHand) |>
+                            andThen (\cards ->
+                               Decode.succeed
+                                 {model | hand = model.hand ++ cards})
+                      "DRAW" ->
+                         (decodeArgAndGet "num_cards" int) |>
+                          andThen (\c ->
+                                 model
+                                   |> modifyGame (addToDeckCount (-c))
+                                   |> Decode.succeed )
+                      "CLEAN_TABLE" ->
+                         model
+                           |> modifyGame cleanTable
+                           |> Decode.succeed
 
-          _ -> Decode.fail action
-      )
+                      "PLAY" ->
+                        (decodeArgAndGet "cards" (list int)) |>
+                        andThen ( \c ->
+                                     model
+                                       |> modifyGame (addToTable (name, c))
+                                       |> Decode.succeed )
+                      "RETURN_TO_DECK" ->
+                         (decodeArgAndGet "num_cards" int) |>
+                          andThen (\c ->
+                                     model
+                                       |> modifyGame (addToDeckCount c)
+                                       |> Decode.succeed )
+
+                      "TAKE_TURN" ->
+                         model
+                           |> modifyRoom (\r ->
+                              {r | current_player =
+                                 List.head (List.filter (\x -> x.name == name) r.players)
+                              })
+                           |> Decode.succeed
+                      "PLAYER_LEFT" ->
+                        model
+                          |> modifyRoom(\r ->
+                            {r | players = List.filter
+                                 (\x -> x.name /= name) r.players,
+                               observers = List.filter
+                                 (\x -> x.name /= name) r.observers})
+                          |> Decode.succeed
+                      "ADD_POINTS" ->
+                         (decodeArgAndGet "points" int) |>
+                         andThen (\score ->
+                             model
+                              |> modifyRoom(\r ->
+                                {r | players = List.map
+                                     (\x -> if x.name /= name
+                                       then {x | score = x.score + score }
+                                       else x
+                                     ) r.players})
+                              |> Decode.succeed
+                              )
+                      "SET_STATE" ->
+                        (at ["arg", "room"] (maybe decodeRoom))
+                        |> andThen (\newroom ->
+                            maybe (at ["arg", "hand"] decodeHand)
+                            |> andThen ( \newhand ->
+                              Decode.succeed
+                                 {model |
+                                   room = newroom --case newroom of
+                                     --Just r -> r
+                                     --Nothing -> model.room
+                                 , hand = case newhand of
+                                     Just h -> h
+                                     Nothing -> model.hand
+                                 }))
+
+                      "GET_STATE" ->
+                         Decode.succeed model
+                      _ -> Decode.fail action
+                  ))
 
 
-subscriptions : Model -> Sub Msg 
+decodeArgAndGet : String -> Decoder a -> Decoder a
+decodeArgAndGet key decoder_type =
+  (field "arg" (Decode.dict decoder_type)) |>
+    andThen ( \arg -> case (Dict.get key arg) of
+      Just value -> Decode.succeed value
+      Nothing -> Decode.fail key)
+
+
+subscriptions : Model -> Sub Msg
 subscriptions _ = messageReceiver Incoming
 
 
