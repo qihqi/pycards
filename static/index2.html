@@ -91,12 +91,6 @@
         var socket = new WebSocket('ws://localhost:8080/ws');
         socket.onopen = function() {
             console.log('Connected');
-            var name = 'han';
-            socket.send(
-                JSON.stringify({action: 'NEW_PLAYER', 
-                    name: name,
-                    arg: name
-                }));
         };
         app.ports.sendMessage.subscribe(function(message) {
             socket.send(message);

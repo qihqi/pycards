@@ -18,7 +18,7 @@ import Json.Decode.Pipeline exposing (required, optional)
 port sendMessage : String -> Cmd msg
 port messageReceiver: (String -> msg) -> Sub msg
 
-type GameStatus = IDLE | OBSERVING | PLAYING
+type GameStatus = NO_NAME | IDLE | OBSERVING | PLAYING
 
 type alias Player =
   { name : String
@@ -97,21 +97,13 @@ modifyGame func = modifyRoom
 
 decodeHand = list int
 
-initialTable : (String, List Int)
-initialTable = ("hand", [2,3,4])
-
 init_state : () -> (Model, Cmd msg)
 init_state _ =
-    ( { room =
-            Just { game = Nothing
-            , players = []
-            , observers = []
-            , current_player = Nothing
-            }
-        , status = IDLE
+    ( { room = Nothing
+        , status = NO_NAME
         , auto_end_turn = False
-        , hand = [0]
-        , my_name = "han"
+        , hand = []
+        , my_name = ""
         , my_team = ""
         , messages = []
         , draft = ""
@@ -131,35 +123,24 @@ main =
       }
 
 type Msg =
-    SetState String
-    | UI UIAction
+    UI UIAction
     | TableSelect Int Bool
     | HandSelect Int Bool
     | Send
     | DraftChanged String
     | MessageReceived String
     | Incoming String
+    | InputFieldChanged (String -> Model -> Model) String
     | None
 
 type UIAction =
     DRAW | PLAY | TAKE_BACK | RETURN_TO_DECK |
-    CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH
+    CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH | NEW_PLAYER
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    SetState x ->
-      ({ model |
-          room =
-             case Decode.decodeString (field "room" (maybe decodeRoom)) x of
-               Ok r -> r
-               Err e -> model.room
-       ,  hand = case Decode.decodeString (field "hand" decodeHand) x of
-               Ok r -> r
-               Err e -> model.hand
-       }
-       , Cmd.none)
 
     MessageReceived m -> ({model | messages = model.messages ++ [m] }, Cmd.none)
 
@@ -193,6 +174,7 @@ update msg model =
             Err e -> Debug.log (Decode.errorToString e) model
         , Cmd.none
         )
+    InputFieldChanged modifier message -> (modifier message model, Cmd.none)
     _ -> (model, Cmd.none)
 
 makeNewModel : UIAction -> Model -> Model
@@ -208,6 +190,8 @@ makeNewModel action model =
             (\x -> not <| Set.member x model.hand_selected)
             model.hand
       }
+    NEW_PLAYER -> 
+      { model | status = IDLE }
     _ -> model
 
 
@@ -266,6 +250,12 @@ makeAction action model =
             , ("action", Encode.string "GET_STATE")
             , ("arg", Encode.string "")
             ]
+        NEW_PLAYER -> 
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "NEW_PLAYER")
+            , ("arg", Encode.string model.my_name)
+            ]
   in Encode.encode 0 msg
 
 makeChatMessage my_name message =
@@ -275,68 +265,96 @@ makeChatMessage my_name message =
             , ("arg", Encode.string message)
             ] )
 
+inputNameField =
+    div [id "start_area"]
+    [ h2 [class "center"] [ text "欢迎来打牌"]
+    , p [class "center"] 
+        [ input 
+          [ placeholder "NAME", id "name", type_ "text"
+          , onInput (InputFieldChanged (\t m -> {m | my_name = t }))
+          ]
+          []
+        , button [id "connect", onClick (UI NEW_PLAYER) ][text "加入游戏"]
+        ]
+    ]
+
+joinGameField = 
+    div [id "start_area"]
+    [ h2 [class "center"] [ text "欢迎来打牌"]
+    , p [class "center"] 
+        [ input 
+          [ placeholder "NAME", id "name", type_ "text"
+          , onInput (InputFieldChanged (\t m -> {m | my_name = t }))
+          ]
+          []
+        , button [id "connect"][text "加入游戏"]
+        ]
+    , p [id "start_button_area", class "center"]
+        [ input [id "num_decks", placeholder "几付牌"] []
+        , button [class "start", id "start"] [text "开始"]
+        ]
+    ]
+
+getDeckCountStr : Room -> String
+getDeckCountStr room = 
+  case room.game of 
+    Just game -> String.fromInt game.deck_count
+    Nothing -> ""
+
+getTable room = 
+  case room.game of 
+    Just game -> game.table
+    Nothing -> []
+  
 
 view model  =
-  (case model.room of
-    Nothing ->
-            div [id "start_area"]
-            [ h2 [class "center"] [ text "欢迎来打牌"]
-            , p [class "center"] 
-                [ input [ placeholder "NAME", id "name", type_ "text"] []
-                , button [id "connect"][text "加入游戏"]
-                ]
-            , p [id "start_button_area", class "center"]
-                [ input [id "num_decks", placeholder "几付牌"] []
-                , button [class "start", id "start"] [text "开始"]
-                ]
-            ]
-              
+  if model.status == NO_NAME then inputNameField
+  else (case model.room of
+    Nothing -> joinGameField
     Just room ->
-      case room.game of 
-        Nothing -> div [][]
-        Just game ->
-            let
-              turnText =
-                  case room.current_player of
-                    Nothing -> ""
-                    Just p -> if p.name == model.my_name then
-                          "YOUR TURN"
-                        else
-                          p.name ++ "'s turn"
-            in
-                div []
-                [ div [ id "chat_area"]
-                      [  h3 [] [text "hello"]
-                      ,  div [id "chat_text"]
-                             (List.map (\x -> p [] [text x]) model.messages)
-                      ,  input
-                           [ id "chat_window"
-                           , attribute "placeholder" "请尬料"
-                           , onInput DraftChanged
-                           , on "keydown" (ifIsEnter Send)
-                           , value model.draft
-                           ]
-                          []
-                      ]
-                , div [ id "table_area" ]
-                      [ h4 [] [ text "Players:"]
-                      , div [class "row", id "players"]
-                          (List.map
-                            (\p ->  div [class "col-sm"]
-                               [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
-                            room.players)
-                      , h4 [] [text ("牌组还剩：" ++ (String.fromInt game.deck_count) ++"张")]
-                      , h4 [id "turn"] [text turnText]
-                      , h3 [] [ text "桌面:"]
-                      , div [class "row", id "table"] (List.map (makeTableCard model.table_selected) game.table)
-                      , hr [] []
-                      ]
-                , div [id "hand_area"]
-                      [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
-                      , div [class "mygrid", id "hand"] (List.map (makeCard True model.hand_selected) model.hand)
-                      ]
-                , controlArea True
-                ])
+        let
+          turnText =
+              case room.current_player of
+                Nothing -> ""
+                Just p -> if p.name == model.my_name then
+                      "YOUR TURN"
+                    else
+                      p.name ++ "'s turn"
+        in
+            div []
+            [ div [ id "chat_area"]
+                  [  h3 [] [text "hello"]
+                  ,  div [id "chat_text"]
+                         (List.map (\x -> p [] [text x]) model.messages)
+                  ,  input
+                       [ id "chat_window"
+                       , attribute "placeholder" "请尬料"
+                       , onInput DraftChanged
+                       , on "keydown" (ifIsEnter Send)
+                       , value model.draft
+                       ]
+                      []
+                  ]
+            , div [ id "table_area" ]
+                  [ h4 [] [ text "Players:"]
+                  , div [class "row", id "players"]
+                      (List.map
+                        (\p ->  div [class "col-sm"]
+                           [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
+                        room.players)
+                  , h4 [] [text ("牌组还剩：" ++ (getDeckCountStr room) ++"张")]
+                  , h4 [id "turn"] [text turnText]
+                  , h3 [] [ text "桌面:"]
+                  , div [class "row", id "table"] 
+                     (List.map (makeTableCard model.table_selected) <| getTable room)
+                  , hr [] []
+                  ]
+            , div [id "hand_area"]
+                  [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
+                  , div [class "mygrid", id "hand"] (List.map (makeCard True model.hand_selected) model.hand)
+                  ]
+            , controlArea True
+            ])
 
 makeTableCard : Set Int -> (String, List Int) -> Html Msg
 makeTableCard selectedSet (player_name, cards) =
