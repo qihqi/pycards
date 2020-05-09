@@ -102,15 +102,17 @@ class GameRoom(GameObj):
     players: List[Player] = field(default_factory=list)
     game: Optional[GameState] = None
     observers: List[Player] = field(default_factory=list)
+    moderator_name: str
     _current_turn: int = 0
     _last_turns: List[Tuple[str, List[int]]] = field(default_factory=list)
 
-    _exposed = ['players', 'game', 'observers', 'current_player']
+    _exposed = ['players', 'game', 'observers', 'current_player', 'moderator_name']
 
-    def __init__(self):
+    def __init__(self, moderator_name):
         self.players = []
         self.observers = []
         self._last_turns = []
+        self.moderator_name = moderator_name
 
     def new_game(self, num_decks):
         self.players += self.observers
@@ -143,7 +145,13 @@ class GameRoom(GameObj):
         except ValueError:
             pass
         if not self.players:
+            # no one is in game
             self.game = None
+        elif player.name == self.moderator_name:
+            # moderator leaves, make a new one
+            all_players = self.players + self.observers
+            if all_players:
+                self.moderator_name = next(iter(all_players))
 
     @property
     def current_player(self):
@@ -161,6 +169,7 @@ class GameRoom(GameObj):
             self.new_game(arg_dict['num_decks'])
             bcommand = 'SET_STATE'
             barg = { 'room': self, 'hand': []}
+            print('here', self.game)
         elif command == 'DRAW':
             assert self.game
             res = self.game.draw(player.name, arg_dict['num_cards'])

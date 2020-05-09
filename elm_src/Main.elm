@@ -64,14 +64,17 @@ type alias Room =
     , players : List Player
     , observers : List Player
     , current_player : Maybe Player
+    , moderator_name: String
     }
 
+decodeRoom : Decoder Room
 decodeRoom =
   Decode.succeed Room
    |> optional "game" (maybe decodeGame) Nothing
    |> required "players" (list decodePlayer)
    |> required "observers" (list decodePlayer)
    |> optional "current_player" (maybe decodePlayer) Nothing
+   |> required "moderator_name" string
 
 
 type alias Model =
@@ -85,6 +88,10 @@ type alias Model =
     , draft: String
     , table_selected: Set Int
     , hand_selected: Set Int
+    , room_code: String
+    , master_input: String
+    , trump_num: Int
+    , trump_suite: Int 
     }
 
 modifyRoom : (Room -> Room) -> Model -> Model
@@ -109,6 +116,10 @@ init_state _ =
         , draft = ""
         , hand_selected = Set.empty
         , table_selected = Set.empty
+        , room_code = ""
+        , master_input = ""
+        , trump_num = 0
+        , trump_suite = 0 
         }
         , Cmd.none
     )
@@ -131,11 +142,13 @@ type Msg =
     | MessageReceived String
     | Incoming String
     | InputFieldChanged (String -> Model -> Model) String
+    | SetTrumpSuite Int
     | None
 
 type UIAction =
     DRAW | PLAY | TAKE_BACK | RETURN_TO_DECK |
-    CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH | NEW_PLAYER
+    CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH | NEW_PLAYER |
+    JOIN_ROOM | NEW_ROOM | NEW_GAME | SPREAD_CARDS
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -175,6 +188,7 @@ update msg model =
         , Cmd.none
         )
     InputFieldChanged modifier message -> (modifier message model, Cmd.none)
+    SetTrumpSuite newsuite -> ( {model | trump_suite = newsuite}, Cmd.none)
     _ -> (model, Cmd.none)
 
 makeNewModel : UIAction -> Model -> Model
@@ -256,6 +270,32 @@ makeAction action model =
             , ("action", Encode.string "NEW_PLAYER")
             , ("arg", Encode.string model.my_name)
             ]
+        NEW_ROOM -> 
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "NEW_ROOM")
+            , ("arg", Encode.string model.room_code)
+            ]
+        JOIN_ROOM -> 
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "JOIN_ROOM")
+            , ("arg", Encode.string model.room_code)
+            ]
+        NEW_GAME ->
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "START")
+            , ("arg", Encode.object 
+                [("num_decks", Encode.int (String.toInt model.master_input |> Maybe.withDefault 0))]
+              )
+            ]
+        SPREAD_CARDS ->
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "SPREAD_CARDS")
+            , ("arg", Encode.int (String.toInt model.master_input |> Maybe.withDefault 0))
+            ]
   in Encode.encode 0 msg
 
 makeChatMessage my_name message =
@@ -274,24 +314,24 @@ inputNameField =
           , onInput (InputFieldChanged (\t m -> {m | my_name = t }))
           ]
           []
-        , button [id "connect", onClick (UI NEW_PLAYER) ][text "加入游戏"]
+        , button [id "connect", onClick (UI NEW_PLAYER) ][text "登陆"]
         ]
     ]
 
-joinGameField = 
+joinGameField model = 
     div [id "start_area"]
-    [ h2 [class "center"] [ text "欢迎来打牌"]
+    [ h2 [class "center"] [ text ("欢迎来打牌: " ++ model.my_name)]
     , p [class "center"] 
         [ input 
-          [ placeholder "NAME", id "name", type_ "text"
-          , onInput (InputFieldChanged (\t m -> {m | my_name = t }))
+          [ placeholder "Room Code"
+          , type_ "text"
+          , id "room_code"
+          , value model.room_code
+          , onInput (InputFieldChanged (\t m -> {m | room_code = t }))
           ]
           []
-        , button [id "connect"][text "加入游戏"]
-        ]
-    , p [id "start_button_area", class "center"]
-        [ input [id "num_decks", placeholder "几付牌"] []
-        , button [class "start", id "start"] [text "开始"]
+        , button [onClick (UI NEW_ROOM)][text "创建游戏"]
+        , button [onClick (UI JOIN_ROOM)][text "加入游戏"]
         ]
     ]
 
@@ -310,7 +350,7 @@ getTable room =
 view model  =
   if model.status == NO_NAME then inputNameField
   else (case model.room of
-    Nothing -> joinGameField
+    Nothing -> joinGameField model
     Just room ->
         let
           turnText =
@@ -351,9 +391,12 @@ view model  =
                   ]
             , div [id "hand_area"]
                   [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
-                  , div [class "mygrid", id "hand"] (List.map (makeCard True model.hand_selected) model.hand)
+                  , div [class "mygrid", id "hand"] ( 
+                    model.hand 
+                    |> List.sortBy (cardToSuiteValue model.trump_suite model.trump_num)
+                    |> List.map (makeCard True model.hand_selected))
                   ]
-            , controlArea True
+            , controlArea (model.my_name == room.moderator_name)
             ])
 
 makeTableCard : Set Int -> (String, List Int) -> Html Msg
@@ -420,6 +463,7 @@ controlArea enableMaster =
                 , name "suite"
                 , type_ "radio"
                 , value "S"
+                , onClick (SetTrumpSuite 3)
                 ] []
             , span [ attribute "style" "font-size:30px" ]
                        [ text "♠" ]
@@ -429,6 +473,7 @@ controlArea enableMaster =
                 , name "suite"
                 , type_ "radio"
                 , value "H"
+                , onClick (SetTrumpSuite 2)
                 ] []
             , span [ attribute "style" "font-size:30px" ]
                        [ text "♥" ]
@@ -438,6 +483,7 @@ controlArea enableMaster =
                 , name "suite"
                 , type_ "radio"
                 , value "D"
+                , onClick (SetTrumpSuite 0)
                 ] []
             , span [ attribute "style" "font-size:30px" ]
                        [ text "♣" ]
@@ -447,25 +493,55 @@ controlArea enableMaster =
                 , name "suite"
                 , type_ "radio"
                 , value "C"
+                , onClick (SetTrumpSuite 1)
                 ] []
             , span [ attribute "style" "font-size:30px" ]
                        [ text "♦" ]
-             ]
+            , span [][text "主数字"]
+            , input 
+              [onInput (InputFieldChanged 
+                (\t m -> {m | trump_num = Maybe.withDefault 0 <| String.toInt t}))]
+              []
+            ]
       ,  if enableMaster then
           div [ class "master", id "master_control" ]
-            [ button [ class "master", id "new_game" ]
+            [ button [ class "master", id "new_game", onClick (UI NEW_GAME)]
                 [ text "新游戏" ]
             , button [ class "master", id "end_draw" ]
                 [ text "停止摸牌" ]
-            , button [ class "master", id "spread_cards" ]
+            , button [ class "master", id "spread_cards", onClick (UI SPREAD_CARDS) ]
                 [ text "发牌" ]
             , button [ class "master", id "deal_from_deck" ]
                 [ text "翻牌" ]
-            , input [ class "master", id "spread_count", placeholder "几张" ]
-                []
+            , input 
+               [class "master", id "spread_count", placeholder "几张" 
+               , onInput (InputFieldChanged (\t m -> {m | master_input = t}))
+               ]
+               []
             ]
           else text ""
       ]
+
+cardToSuiteValue : Int -> Int -> Int -> (Int, Int)
+cardToSuiteValue tsuite tval card_val = 
+  let 
+    val = card_val |> modBy 54 |> modBy 13
+    suite = card_val |> modBy 54 |> (\x -> x // 13)
+    val2 = 
+      if (suite == 4) then --joker
+          val + 20
+      else if val == (tval - 2) && (suite == tsuite) then --suite num
+          16 
+      else if (val == tval - 2) then -- just num
+          15
+      else
+          val
+    suite2 = 
+      if suite == tsuite || val == tval - 2 then 
+          4
+      else 
+          suite
+  in (suite2, val2)
 
 
 execAction : Model -> Decode.Decoder Model
@@ -544,9 +620,7 @@ execAction model =
                             |> andThen ( \newhand ->
                               Decode.succeed
                                  {model |
-                                   room = newroom --case newroom of
-                                     --Just r -> r
-                                     --Nothing -> model.room
+                                   room = newroom
                                  , hand = case newhand of
                                      Just h -> h
                                      Nothing -> model.hand

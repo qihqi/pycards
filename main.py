@@ -40,7 +40,9 @@ async def spread_cards(game, sockets, cards):
 class State(object):
     players: Dict[str, game.Player] = field(default_factory=dict)
     ws_by_name: Dict[str, object] = field(default_factory=dict)
-    room: game.GameRoom = game.GameRoom()
+    rooms_by_name: Dict[str, game.GameRoom] = field(default_factory=dict)
+    # player name -> the room its in.
+    player_to_room: Dict[str, game.GameRoom] = field(default_factory=dict)
 
 
 async def index(request):
@@ -76,8 +78,35 @@ async def ws_handler(request):
                     else:
                         current_player = game.Player(name, 0)
                         state.players[name] = current_player
-                    if current_player in state.room.players:
-                        if state.room.game:
+                elif action == 'SPREAD_CARDS':
+                    count = int(arg)
+                    room = state.player_to_room[current_player.name]
+                    await spread_cards(room.game, state.ws_by_name, count)
+                elif action == 'MESSAGE':
+                    broadcast = {
+                        'name': current_player.name,
+                        'action': 'MESSAGE',
+                        'arg': arg
+                    }
+                elif action == 'NEW_ROOM':
+                    room = game.GameRoom(name)
+                    state.rooms_by_name[arg] = room
+                    state.player_to_room[name] = room
+                    broadcast = {
+                        'name': '',
+                        'action': 'SET_STATE',
+                        'arg': {
+                            'room': room,
+                        }
+                    }
+                    room.observers.append(current_player)
+                elif action == 'JOIN_ROOM':
+                    room = state.rooms_by_name.get(arg)
+                    if room is None:
+                        raise ValueError('Room does not exist')
+                    state.player_to_room[name] = room
+                    if current_player in room.players:
+                        if room.game:
                             reply_result = {
                                 'name': '',
                                 'action': 'SET_STATE',
@@ -86,28 +115,21 @@ async def ws_handler(request):
                                 }
                             }
                     else:
-                        if current_player not in state.room.observers:
-                            state.room.observers.append(current_player)
+                        if current_player not in room.observers:
+                            room.observers.append(current_player)
                     broadcast = {
                         'name': '',
                         'action': 'SET_STATE',
                         'arg': {
-                            'room': state.room,
+                            'room': room,
                         }
-                    }
-                elif action == 'SPREAD_CARDS':
-                    count = int(arg)
-                    await spread_cards(state.room.game, state.ws_by_name, count)
-                elif action == 'MESSAGE':
-                    broadcast = {
-                        'name': current_player.name,
-                        'action': 'MESSAGE',
-                        'arg': arg
                     }
                 else:
                     assert new_name is None or current_player.name == new_name
-                    reply_result, broadcast = state.room.handle_command(current_player, action, arg)
-            except ValueError as e:
+                    if new_name:
+                        room = state.player_to_room[current_player.name]
+                        reply_result, broadcast = room.handle_command(current_player, action, arg)
+            except Exception as e:
                 print(e)
                 import traceback
                 traceback.print_exc()
@@ -124,7 +146,9 @@ async def ws_handler(request):
             break
 
     if current_player is not None:
-        state.room.leave_room(current_player)
+        room = state.player_to_room.get(current_player.name)
+        if room:
+            room.leave_room(current_player)
     del state.ws_by_name[current_player.name]
     to_send = []
     print('PLAYER_LEFT', current_player.name)
