@@ -88,6 +88,19 @@ async def ws_handler(request):
                         'action': 'MESSAGE',
                         'arg': arg
                     }
+                    if arg.startswith('!'):
+                        try:
+                            score = int(arg[1:])
+                            room = state.player_to_room[current_player.name]
+                            reply, broad = room.handle_command(
+                                    current_player, 'ADD_POINTS', {'points': score})
+                            to_send = []
+                            for ws in state.ws_by_name.values():
+                                to_send.append(ws.send_json(broad, dumps=json_dumps))
+                            asyncio.gather(*to_send)
+                        except Exception as e:
+                            print(e)
+
                 elif action == 'NEW_ROOM':
                     room = game.GameRoom(name)
                     state.rooms_by_name[arg] = room

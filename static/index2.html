@@ -102,6 +102,16 @@
             console.log(event.data);
             app.ports.messageReceiver.send(event.data);
         });
+
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target.tagName == 'INPUT') {
+                return;
+            }
+            app.ports.messageReceiver.send(JSON.stringify(
+                        { "key": e.key }
+            ));
+        }, false);
         </script>
 	</body>
 </html>

@@ -7,6 +7,7 @@ import Dict
 import Debug
 import Html exposing (Html, button, div, text, h2, h3, h4, hr, span, input, form, img, p)
 import Html.Events exposing (onClick, on, onInput, onCheck)
+import Browser.Events exposing (onKeyDown)
 import Html.Attributes exposing (class, id, style, attribute, name, value, type_, placeholder, checked)
 import String
 
@@ -139,7 +140,6 @@ type Msg =
     | HandSelect Int Bool
     | Send
     | DraftChanged String
-    | MessageReceived String
     | Incoming String
     | InputFieldChanged (String -> Model -> Model) String
     | SetTrumpSuite Int
@@ -148,15 +148,13 @@ type Msg =
 type UIAction =
     DRAW | PLAY | TAKE_BACK | RETURN_TO_DECK |
     CLEAN_TABLE | END_TURN | TAKE_TURN | REFRESH | NEW_PLAYER |
-    JOIN_ROOM | NEW_ROOM | NEW_GAME | SPREAD_CARDS
+    JOIN_ROOM | NEW_ROOM | NEW_GAME | SPREAD_CARDS | JOIN_GAME
+
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-
-    MessageReceived m -> ({model | messages = model.messages ++ [m] }, Cmd.none)
-
     Send -> ({model | draft = ""}, sendMessage (makeChatMessage model.my_name model.draft))
 
     DraftChanged m -> ({model | draft = m}, Cmd.none)
@@ -296,6 +294,13 @@ makeAction action model =
             , ("action", Encode.string "SPREAD_CARDS")
             , ("arg", Encode.int (String.toInt model.master_input |> Maybe.withDefault 0))
             ]
+        JOIN_GAME ->
+          Encode.object 
+            [ ("name", Encode.string model.my_name)
+            , ("action", Encode.string "JOIN_GAME")
+            , ("arg", Encode.string "")
+            ]
+          
   in Encode.encode 0 msg
 
 makeChatMessage my_name message =
@@ -363,8 +368,7 @@ view model  =
         in
             div []
             [ div [ id "chat_area"]
-                  [  h3 [] [text "hello"]
-                  ,  div [id "chat_text"]
+                  [  div [id "chat_text"]
                          (List.map (\x -> p [] [text x]) model.messages)
                   ,  input
                        [ id "chat_window"
@@ -438,21 +442,24 @@ controlArea enableMaster =
    div -- control area
       [id "control_area", style "vertical-align" "text-top"]
       [ input [type_ "checkbox", id "auto_end_turn", attribute "checked" ""]
-            [text "自动结束回合"]
+            []
+      , text "自动结束回合"
       , button [ class "turn_control", id "draw", onClick (UI DRAW)]
-           [ text "摸牌(v)" ]
-      , button [ class "turn_control", id "send",  onClick (UI PLAY)]
-            [ text "出牌(b)" ]
+           [ text "摸牌(z)" ]
       , button [ class "turn_control", id "takeback", onClick (UI TAKE_BACK) ]
             [ text "拿回来" ]
       , button [ class "turn_control", id "return_to_deck", onClick (UI RETURN_TO_DECK) ]
             [ text "放回牌组" ]
-      , button [ class "turn_control", id "clear_table", onClick (UI CLEAN_TABLE) ]
-            [ text "清空桌面(n)" ]
       , button [ class "turn_control", id "end_turn", onClick (UI END_TURN) ]
             [ text "结束回合" ]
       , button [ id "refresh", onClick (UI REFRESH) ]
             [ text "刷新" ]
+      , button [onClick (UI JOIN_GAME) ]
+            [ text "从新加入" ]
+      , button [ class "turn_control", id "send",  onClick (UI PLAY)]
+            [ text "出牌(b)" ]
+      , button [ class "turn_control", id "clear_table", onClick (UI CLEAN_TABLE) ]
+            [ text "清空桌面(n)" ]
       , button [ id "take_turn", onClick (UI TAKE_TURN) ]
             [ text "该我了(m)" ]
       , form [ id "sort_form" ]
@@ -607,7 +614,7 @@ execAction model =
                              model
                               |> modifyRoom(\r ->
                                 {r | players = List.map
-                                     (\x -> if x.name /= name
+                                     (\x -> if x.name == name
                                        then {x | score = x.score + score }
                                        else x
                                      ) r.players})
@@ -628,6 +635,12 @@ execAction model =
 
                       "GET_STATE" ->
                          Decode.succeed model
+                      "MESSAGE" -> 
+                        (field "arg" string)
+                        |> andThen ( \m -> 
+                             Decode.succeed 
+                               { model | messages = model.messages 
+                                 ++ [name ++ ": " ++ m] })
                       _ -> Decode.fail action
                   ))
 
@@ -641,15 +654,55 @@ decodeArgAndGet key decoder_type =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ = messageReceiver Incoming
+subscriptions model = messageReceiver (handleIncomingEvents model)
 
+controlKeys = Dict.fromList 
+  [  ("z", DRAW)
+  ,  ("b", PLAY)
+  ,  ("n", CLEAN_TABLE)
+  ,  ("m", END_TURN)
+  ]
+cardSelectKeys = [
+    "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",  "0",  "-",  "=",
+    "q",  "w",  "e",  "r",  "t",  "y",  "u",  "i",  "o",  "p",  "[",  "]",
+    "a",  "s",  "d",  "f",  "g",  "h",  "j",  "k",  ";",  "'"] 
+    |> List.indexedMap (\x y -> (y, x))
+    |> Dict.fromList
+
+
+handleIncomingEvents : Model -> String -> Msg
+handleIncomingEvents model msg = 
+  case (Decode.decodeString (field "key" string) msg) of
+    Ok key -> case Dict.get key controlKeys of
+      Just e -> UI e
+      Nothing -> case Dict.get key cardSelectKeys of
+        Just e -> case Array.get e
+                        (model.hand 
+                        |> List.sortBy (cardToSuiteValue model.trump_suite model.trump_num)
+                        |> Array.fromList)
+            of 
+                Just card ->
+                   HandSelect card <| not (Set.member card model.hand_selected)
+                Nothing -> None
+        Nothing -> None
+    Err _ -> Incoming msg
 
 ifIsEnter msg =
   Decode.field "key" Decode.string
     |> Decode.andThen (\key -> if key == "Enter" then Decode.succeed msg else Decode.fail "some other key")
 
 --TODO
-cardText = String.fromInt
+suites = Array.fromList ["♠", "♥", "♣", "♦"]
+cardText : Int -> String
+cardText cardv = 
+  let 
+    suite = cardv |> modBy 54 |> (\x -> x // 13)
+    val = cardv |> modBy 54 |> modBy 13
+  in
+    if suite == 4 then
+        if val == 0 then "小" else "大"
+    else
+        (Maybe.withDefault "" <| Array.get suite suites) ++ (String.fromInt val)
 
 
 cardImgUrls = Array.fromList
