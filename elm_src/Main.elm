@@ -182,7 +182,7 @@ update msg model =
     Incoming message ->
         ( case (Decode.decodeString (execAction model) message) of
             Ok m -> m
-            Err e -> Debug.log (Decode.errorToString e) model
+            Err e -> model
         , Cmd.none
         )
     InputFieldChanged modifier message -> (modifier message model, Cmd.none)
@@ -376,7 +376,7 @@ view model  =
                   []
               ]
          ] ++ case room.game of 
-          Nothing -> Debug.log "here" (waitingArea model room)
+          Nothing -> waitingArea model room
           Just game -> 
             let
               turnText =
