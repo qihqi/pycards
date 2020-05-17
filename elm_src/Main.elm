@@ -350,6 +350,11 @@ getTable room =
   case room.game of 
     Just game -> game.table
     Nothing -> []
+
+waitingArea model room = 
+    ([ h2[] [ text "Players waiting:" ]
+    ] ++ (List.map (\x -> p [] [ text x.name ]) (room.players ++ room.observers)) ++
+    [controlArea (model.my_name == room.moderator_name)])
   
 
 view model  =
@@ -357,51 +362,56 @@ view model  =
   else (case model.room of
     Nothing -> joinGameField model
     Just room ->
-        let
-          turnText =
-              case room.current_player of
-                Nothing -> ""
-                Just p -> if p.name == model.my_name then
-                      "YOUR TURN"
-                    else
-                      p.name ++ "'s turn"
-        in
-            div []
-            [ div [ id "chat_area"]
-                  [  div [id "chat_text"]
-                         (List.map (\x -> p [] [text x]) model.messages)
-                  ,  input
-                       [ id "chat_window"
-                       , attribute "placeholder" "请尬料"
-                       , onInput DraftChanged
-                       , on "keydown" (ifIsEnter Send)
-                       , value model.draft
-                       ]
-                      []
-                  ]
-            , div [ id "table_area" ]
-                  [ h4 [] [ text "Players:"]
-                  , div [class "row", id "players"]
-                      (List.map
-                        (\p ->  div [class "col-sm"]
-                           [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
-                        room.players)
-                  , h4 [] [text ("牌组还剩：" ++ (getDeckCountStr room) ++"张")]
-                  , h4 [id "turn"] [text turnText]
-                  , h3 [] [ text "桌面:"]
-                  , div [class "row", id "table"] 
-                     (List.map (makeTableCard model.table_selected) <| getTable room)
-                  , hr [] []
-                  ]
-            , div [id "hand_area"]
-                  [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
-                  , div [class "mygrid", id "hand"] ( 
-                    model.hand 
-                    |> List.sortBy (cardToSuiteValue model.trump_suite model.trump_num)
-                    |> List.map (makeCard True model.hand_selected))
-                  ]
-            , controlArea (model.my_name == room.moderator_name)
-            ])
+        div []
+        ([ div [ id "chat_area"]
+              [  div [id "chat_text"]
+                     (List.map (\x -> p [] [text x]) model.messages)
+              ,  input
+                   [ id "chat_window"
+                   , attribute "placeholder" "请尬料"
+                   , onInput DraftChanged
+                   , on "keydown" (ifIsEnter Send)
+                   , value model.draft
+                   ]
+                  []
+              ]
+         ] ++ case room.game of 
+          Nothing -> Debug.log "here" (waitingArea model room)
+          Just game -> 
+            let
+              turnText =
+                  case room.current_player of
+                    Nothing -> ""
+                    Just p -> if p.name == model.my_name then
+                          "YOUR TURN"
+                        else
+                          p.name ++ "'s turn"
+            in
+                [ div [ id "table_area" ]
+                      [ h4 [] [ text "Players:"]
+                      , div [class "row", id "players"]
+                          (List.map
+                            (\p ->  div [class "col-sm"]
+                               [ text (p.name ++ "(" ++ (String.fromInt p.score) ++ ")")])
+                            room.players)
+                      , h4 [] [text ("牌组还剩：" ++ (getDeckCountStr room) ++"张")]
+                      , h4 [id "turn"] [text turnText]
+                      , h3 [] [ text "桌面:"]
+                      , div [class "row", id "table"] 
+                         (List.map (makeTableCard model.table_selected) <| getTable room)
+                      , hr [] []
+                      ]
+                , div [id "hand_area"]
+                      [ h3 [][text <| "手牌 (" ++ (String.fromInt <| List.length model.hand) ++ "):"]
+                      , div [class "mygrid", id "hand"] ( 
+                        model.hand 
+                        |> List.sortBy (cardToSuiteValue model.trump_suite model.trump_num)
+                        |> List.map (makeCard True model.hand_selected))
+                      ]
+                , controlArea (model.my_name == room.moderator_name)
+                ]
+        )
+    )
 
 makeTableCard : Set Int -> (String, List Int) -> Html Msg
 makeTableCard selectedSet (player_name, cards) =

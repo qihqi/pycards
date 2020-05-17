@@ -46,7 +46,7 @@ class State(object):
 
 
 async def index(request):
-    return web.FileResponse('static/index.html')
+    return web.FileResponse('static/index2.html')
 
 
 async def ws_handler(request):
@@ -102,16 +102,23 @@ async def ws_handler(request):
                             print(e)
 
                 elif action == 'NEW_ROOM':
-                    room = game.GameRoom(name)
-                    state.rooms_by_name[arg] = room
-                    state.player_to_room[name] = room
-                    broadcast = {
-                        'name': '',
-                        'action': 'SET_STATE',
-                        'arg': {
-                            'room': room,
+                    if arg in state.rooms_by_name:
+                        reply_result = {
+                            'name': '',
+                            'action': 'SET_STATE',
+                            'arg': {}
                         }
-                    }
+                    else:
+                        room = game.GameRoom(name)
+                        state.rooms_by_name[arg] = room
+                        state.player_to_room[name] = room
+                        broadcast = {
+                            'name': '',
+                            'action': 'SET_STATE',
+                            'arg': {
+                                'room': room,
+                            }
+                        }
                     room.observers.append(current_player)
                 elif action == 'JOIN_ROOM':
                     room = state.rooms_by_name.get(arg)

@@ -7507,6 +7507,38 @@ var $author$project$Main$makeTableCard = F2(
 						]))
 				]));
 	});
+var $author$project$Main$waitingArea = F2(
+	function (model, room) {
+		return _Utils_ap(
+			_List_fromArray(
+				[
+					A2(
+					$elm$html$Html$h2,
+					_List_Nil,
+					_List_fromArray(
+						[
+							$elm$html$Html$text('Players waiting:')
+						]))
+				]),
+			_Utils_ap(
+				A2(
+					$elm$core$List$map,
+					function (x) {
+						return A2(
+							$elm$html$Html$p,
+							_List_Nil,
+							_List_fromArray(
+								[
+									$elm$html$Html$text(x.name)
+								]));
+					},
+					_Utils_ap(room.players, room.observers)),
+				_List_fromArray(
+					[
+						$author$project$Main$controlArea(
+						_Utils_eq(model.my_name, room.moderator_name))
+					])));
+	});
 var $author$project$Main$view = function (model) {
 	if (_Utils_eq(model.status, $author$project$Main$NO_NAME)) {
 		return $author$project$Main$inputNameField;
@@ -7516,172 +7548,187 @@ var $author$project$Main$view = function (model) {
 			return $author$project$Main$joinGameField(model);
 		} else {
 			var room = _v0.a;
-			var turnText = function () {
-				var _v1 = room.current_player;
-				if (_v1.$ === 'Nothing') {
-					return '';
-				} else {
-					var p = _v1.a;
-					return _Utils_eq(p.name, model.my_name) ? 'YOUR TURN' : (p.name + '\'s turn');
-				}
-			}();
 			return A2(
 				$elm$html$Html$div,
 				_List_Nil,
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$id('chat_area')
-							]),
-						_List_fromArray(
-							[
-								A2(
-								$elm$html$Html$div,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$id('chat_text')
-									]),
-								A2(
-									$elm$core$List$map,
-									function (x) {
-										return A2(
-											$elm$html$Html$p,
+				_Utils_ap(
+					_List_fromArray(
+						[
+							A2(
+							$elm$html$Html$div,
+							_List_fromArray(
+								[
+									$elm$html$Html$Attributes$id('chat_area')
+								]),
+							_List_fromArray(
+								[
+									A2(
+									$elm$html$Html$div,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$id('chat_text')
+										]),
+									A2(
+										$elm$core$List$map,
+										function (x) {
+											return A2(
+												$elm$html$Html$p,
+												_List_Nil,
+												_List_fromArray(
+													[
+														$elm$html$Html$text(x)
+													]));
+										},
+										model.messages)),
+									A2(
+									$elm$html$Html$input,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$id('chat_window'),
+											A2($elm$html$Html$Attributes$attribute, 'placeholder', '请尬料'),
+											$elm$html$Html$Events$onInput($author$project$Main$DraftChanged),
+											A2(
+											$elm$html$Html$Events$on,
+											'keydown',
+											$author$project$Main$ifIsEnter($author$project$Main$Send)),
+											$elm$html$Html$Attributes$value(model.draft)
+										]),
+									_List_Nil)
+								]))
+						]),
+					function () {
+						var _v1 = room.game;
+						if (_v1.$ === 'Nothing') {
+							return A2(
+								$elm$core$Debug$log,
+								'here',
+								A2($author$project$Main$waitingArea, model, room));
+						} else {
+							var game = _v1.a;
+							var turnText = function () {
+								var _v2 = room.current_player;
+								if (_v2.$ === 'Nothing') {
+									return '';
+								} else {
+									var p = _v2.a;
+									return _Utils_eq(p.name, model.my_name) ? 'YOUR TURN' : (p.name + '\'s turn');
+								}
+							}();
+							return _List_fromArray(
+								[
+									A2(
+									$elm$html$Html$div,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$id('table_area')
+										]),
+									_List_fromArray(
+										[
+											A2(
+											$elm$html$Html$h4,
 											_List_Nil,
 											_List_fromArray(
 												[
-													$elm$html$Html$text(x)
-												]));
-									},
-									model.messages)),
-								A2(
-								$elm$html$Html$input,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$id('chat_window'),
-										A2($elm$html$Html$Attributes$attribute, 'placeholder', '请尬料'),
-										$elm$html$Html$Events$onInput($author$project$Main$DraftChanged),
-										A2(
-										$elm$html$Html$Events$on,
-										'keydown',
-										$author$project$Main$ifIsEnter($author$project$Main$Send)),
-										$elm$html$Html$Attributes$value(model.draft)
-									]),
-								_List_Nil)
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$id('table_area')
-							]),
-						_List_fromArray(
-							[
-								A2(
-								$elm$html$Html$h4,
-								_List_Nil,
-								_List_fromArray(
-									[
-										$elm$html$Html$text('Players:')
-									])),
-								A2(
-								$elm$html$Html$div,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('row'),
-										$elm$html$Html$Attributes$id('players')
-									]),
-								A2(
-									$elm$core$List$map,
-									function (p) {
-										return A2(
+													$elm$html$Html$text('Players:')
+												])),
+											A2(
 											$elm$html$Html$div,
 											_List_fromArray(
 												[
-													$elm$html$Html$Attributes$class('col-sm')
+													$elm$html$Html$Attributes$class('row'),
+													$elm$html$Html$Attributes$id('players')
 												]),
+											A2(
+												$elm$core$List$map,
+												function (p) {
+													return A2(
+														$elm$html$Html$div,
+														_List_fromArray(
+															[
+																$elm$html$Html$Attributes$class('col-sm')
+															]),
+														_List_fromArray(
+															[
+																$elm$html$Html$text(
+																p.name + ('(' + ($elm$core$String$fromInt(p.score) + ')')))
+															]));
+												},
+												room.players)),
+											A2(
+											$elm$html$Html$h4,
+											_List_Nil,
 											_List_fromArray(
 												[
 													$elm$html$Html$text(
-													p.name + ('(' + ($elm$core$String$fromInt(p.score) + ')')))
-												]));
-									},
-									room.players)),
-								A2(
-								$elm$html$Html$h4,
-								_List_Nil,
-								_List_fromArray(
-									[
-										$elm$html$Html$text(
-										'牌组还剩：' + ($author$project$Main$getDeckCountStr(room) + '张'))
-									])),
-								A2(
-								$elm$html$Html$h4,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$id('turn')
-									]),
-								_List_fromArray(
-									[
-										$elm$html$Html$text(turnText)
-									])),
-								A2(
-								$elm$html$Html$h3,
-								_List_Nil,
-								_List_fromArray(
-									[
-										$elm$html$Html$text('桌面:')
-									])),
-								A2(
-								$elm$html$Html$div,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('row'),
-										$elm$html$Html$Attributes$id('table')
-									]),
-								A2(
-									$elm$core$List$map,
-									$author$project$Main$makeTableCard(model.table_selected),
-									$author$project$Main$getTable(room))),
-								A2($elm$html$Html$hr, _List_Nil, _List_Nil)
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$id('hand_area')
-							]),
-						_List_fromArray(
-							[
-								A2(
-								$elm$html$Html$h3,
-								_List_Nil,
-								_List_fromArray(
-									[
-										$elm$html$Html$text(
-										'手牌 (' + ($elm$core$String$fromInt(
-											$elm$core$List$length(model.hand)) + '):'))
-									])),
-								A2(
-								$elm$html$Html$div,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('mygrid'),
-										$elm$html$Html$Attributes$id('hand')
-									]),
-								A2(
-									$elm$core$List$map,
-									A2($author$project$Main$makeCard, true, model.hand_selected),
+													'牌组还剩：' + ($author$project$Main$getDeckCountStr(room) + '张'))
+												])),
+											A2(
+											$elm$html$Html$h4,
+											_List_fromArray(
+												[
+													$elm$html$Html$Attributes$id('turn')
+												]),
+											_List_fromArray(
+												[
+													$elm$html$Html$text(turnText)
+												])),
+											A2(
+											$elm$html$Html$h3,
+											_List_Nil,
+											_List_fromArray(
+												[
+													$elm$html$Html$text('桌面:')
+												])),
+											A2(
+											$elm$html$Html$div,
+											_List_fromArray(
+												[
+													$elm$html$Html$Attributes$class('row'),
+													$elm$html$Html$Attributes$id('table')
+												]),
+											A2(
+												$elm$core$List$map,
+												$author$project$Main$makeTableCard(model.table_selected),
+												$author$project$Main$getTable(room))),
+											A2($elm$html$Html$hr, _List_Nil, _List_Nil)
+										])),
 									A2(
-										$elm$core$List$sortBy,
-										A2($author$project$Main$cardToSuiteValue, model.trump_suite, model.trump_num),
-										model.hand)))
-							])),
-						$author$project$Main$controlArea(
-						_Utils_eq(model.my_name, room.moderator_name))
-					]));
+									$elm$html$Html$div,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$id('hand_area')
+										]),
+									_List_fromArray(
+										[
+											A2(
+											$elm$html$Html$h3,
+											_List_Nil,
+											_List_fromArray(
+												[
+													$elm$html$Html$text(
+													'手牌 (' + ($elm$core$String$fromInt(
+														$elm$core$List$length(model.hand)) + '):'))
+												])),
+											A2(
+											$elm$html$Html$div,
+											_List_fromArray(
+												[
+													$elm$html$Html$Attributes$class('mygrid'),
+													$elm$html$Html$Attributes$id('hand')
+												]),
+											A2(
+												$elm$core$List$map,
+												A2($author$project$Main$makeCard, true, model.hand_selected),
+												A2(
+													$elm$core$List$sortBy,
+													A2($author$project$Main$cardToSuiteValue, model.trump_suite, model.trump_num),
+													model.hand)))
+										])),
+									$author$project$Main$controlArea(
+									_Utils_eq(model.my_name, room.moderator_name))
+								]);
+						}
+					}()));
 		}
 	}
 };

@@ -87,8 +87,11 @@
             var app = Elm.Main.init( {
                  node: document.getElementById("play_area")
             });
+        let protocol = window.location.protocol == 'http' ? 'ws' : 'wss';
 
-        var socket = new WebSocket('ws://localhost:8080/ws');
+        let wsurl = 'ws' + window.location.href.substr(4) + 'ws';
+
+        var socket = new WebSocket(wsurl);
         socket.onopen = function() {
             console.log('Connected');
         };
